@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+<link rel="stylesheet" href="/css/main.css?v=7.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: false,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="版本情况dbutils:1.1; pymysql:0.9.3; python:2.7.13  线上情景最近线上维护时，由于只需要更改数据库配置，所以就重启了数据库，而python应用没有重启。在重启数据库后，日志显示正常，也能成功入库。后来接到反馈表示有部分数据没有入库，紧急重启python应用，后续数据入库正常。而我则负责找出原因以及修复bug的工作。 调研原因在排查完其他问题后，最异常的是对">
+<meta name="keywords" content="mysql,python">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题">
+<meta property="og:url" content="http://blog.zhang7long.com/2019/12/23/使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题.html">
+<meta property="og:site_name" content="keep running">
+<meta property="og:description" content="版本情况dbutils:1.1; pymysql:0.9.3; python:2.7.13  线上情景最近线上维护时，由于只需要更改数据库配置，所以就重启了数据库，而python应用没有重启。在重启数据库后，日志显示正常，也能成功入库。后来接到反馈表示有部分数据没有入库，紧急重启python应用，后续数据入库正常。而我则负责找出原因以及修复bug的工作。 调研原因在排查完其他问题后，最异常的是对">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2020-05-17T06:32:49.291Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题">
+<meta name="twitter:description" content="版本情况dbutils:1.1; pymysql:0.9.3; python:2.7.13  线上情景最近线上维护时，由于只需要更改数据库配置，所以就重启了数据库，而python应用没有重启。在重启数据库后，日志显示正常，也能成功入库。后来接到反馈表示有部分数据没有入库，紧急重启python应用，后续数据入库正常。而我则负责找出原因以及修复bug的工作。 调研原因在排查完其他问题后，最异常的是对">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="http://blog.zhang7long.com/2019/12/23/使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题 | keep running</title>
+  
+
+
+
+
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">keep running</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2019/12/23/使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题
+
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2019-12-23 00:03:14" itemprop="dateCreated datePublished" datetime="2019-12-23T00:03:14+08:00">2019-12-23</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <blockquote>
+<p>版本情况dbutils:1.1; pymysql:0.9.3; python:2.7.13</p>
+</blockquote>
+<h2 id="线上情景"><a href="#线上情景" class="headerlink" title="线上情景"></a>线上情景</h2><p>最近线上维护时，由于只需要更改数据库配置，所以就重启了数据库，而python应用没有重启。在重启数据库后，日志显示正常，也能成功入库。后来接到反馈表示有部分数据没有入库，紧急重启python应用，后续数据入库正常。而我则负责找出原因以及修复bug的工作。</p>
+<h2 id="调研原因"><a href="#调研原因" class="headerlink" title="调研原因"></a>调研原因</h2><p>在排查完其他问题后，最异常的是对于有部分请求，日志显示处理成功了，但是却没入库，排查了好几天找不到原因。为此写了demo来帮助排查，为了可以自动commit，采用的是setsession=[“set autocommit=1”]方式设置每个底层的连接为自动提交。在测试demo期间，数据库重启后之后的sql就无法入库。demo代码如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># -*- coding: utf-8 -*-</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> pymysql</span><br><span class="line"><span class="keyword">import</span> time</span><br><span class="line"><span class="keyword">import</span> traceback</span><br><span class="line"><span class="keyword">from</span> DBUtils.PooledDB <span class="keyword">import</span> PooledDB</span><br><span class="line"><span class="keyword">from</span> pymysql <span class="keyword">import</span> MySQLError</span><br><span class="line"></span><br><span class="line">pymysql.install_as_MySQLdb()</span><br><span class="line">con = <span class="keyword">None</span></span><br><span class="line">pooledDB = <span class="keyword">None</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">try_insert</span><span class="params">()</span>:</span></span><br><span class="line">    i = <span class="number">0</span></span><br><span class="line">    <span class="keyword">while</span> i &lt; <span class="number">60</span>:</span><br><span class="line">        <span class="keyword">print</span> <span class="string">"============ &#123;0&#125; ============"</span>.format(i)</span><br><span class="line">        <span class="comment"># 除了第一次从库中拿，不用ping，直接接初始化链接</span></span><br><span class="line">        <span class="comment"># 后面如果有cache connection，则从cache中并且进行ping，如果失败则用_create()重新初始化connection</span></span><br><span class="line">        <span class="comment"># con 类型为 PooledDedicatedDBConnection</span></span><br><span class="line">        <span class="comment"># con._con 类型为 SteadyDBConnection</span></span><br><span class="line">        <span class="comment"># con._con._con 类型为 pymysql中的Connection类型</span></span><br><span class="line">        <span class="comment"># con._con._con._sock 类型为 mysql 连接</span></span><br><span class="line">        con = pooledDB.connection()</span><br><span class="line">        <span class="comment"># con._con._con.autocommit(True)</span></span><br><span class="line">        <span class="keyword">print</span> <span class="string">"con._con id = &#123;0&#125;"</span>.format(id(con._con))</span><br><span class="line">        <span class="keyword">print</span> <span class="string">"con._con._con id = &#123;0&#125;"</span>.format(id(con._con._con))</span><br><span class="line">        <span class="keyword">print</span> <span class="string">"con._con._con._sock id = &#123;0&#125;"</span>.format(id(con._con._con._sock))</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            cursor = con.cursor(pymysql.cursors.DictCursor)</span><br><span class="line">            <span class="keyword">if</span> <span class="keyword">not</span> cursor:</span><br><span class="line">                <span class="keyword">print</span> <span class="string">"cursor is &#123;0&#125;"</span>.format(cursor)</span><br><span class="line">            select_sql = <span class="string">"insert into user2(name,age) values('zhang', 20)"</span></span><br><span class="line">            ret_rows = cursor.execute(select_sql)</span><br><span class="line">            <span class="keyword">print</span> cursor._last_executed</span><br><span class="line">            <span class="keyword">print</span> <span class="string">"ret_rows is &#123;0&#125;"</span>.format(ret_rows)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">except</span> MySQLError <span class="keyword">as</span> e:</span><br><span class="line">            <span class="keyword">print</span> <span class="string">"MySQLError error: &#123;0&#125;"</span>.format(e)</span><br><span class="line">            <span class="keyword">print</span> traceback.format_exc()</span><br><span class="line">        <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">            <span class="keyword">print</span> <span class="string">"Exception error: &#123;0&#125;"</span>.format(e)</span><br><span class="line">            <span class="keyword">print</span> traceback.format_exc()</span><br><span class="line"></span><br><span class="line">        i = i + <span class="number">1</span></span><br><span class="line">        time.sleep(<span class="number">1</span>)</span><br><span class="line">        con.close()</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">"__main__"</span>:</span><br><span class="line">    db_conf = &#123;<span class="string">'user'</span>:<span class="string">'root'</span>,<span class="string">'passwd'</span>:<span class="string">'zhang'</span>,<span class="string">'host'</span>:<span class="string">'127.0.0.1'</span>,<span class="string">'port'</span>:<span class="number">3306</span>,<span class="string">'connect_timeout'</span>:<span class="number">5</span>,<span class="string">'db'</span>:<span class="string">'test_dbutils'</span>&#125;</span><br><span class="line">    <span class="comment"># db_conf = &#123;'user':'root','passwd':'zhang','host':'127.0.0.1','port':3306,'connect_timeout':5,'db':'test_dbutils',"autocommit":True&#125;</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    pooledDB = PooledDB(</span><br><span class="line">        creator=pymysql,  <span class="comment"># 使用数据库连接的模块</span></span><br><span class="line">        maxconnections=<span class="number">4</span>,  <span class="comment"># 连接池允许的最大连接数，0和None表示不限制连接数</span></span><br><span class="line">        mincached=<span class="number">0</span>,  <span class="comment"># 初始化时，连接池中至少创建的空闲的链接，0表示不创建</span></span><br><span class="line">        maxcached=<span class="number">0</span>,  <span class="comment"># 连接池中最多闲置的链接，0和None不限制</span></span><br><span class="line">        maxshared=<span class="number">0</span>,  <span class="comment"># 连接池中最多共享的链接数量，0表示不共享。PS: 无用，因为pymysql和MySQLdb等模块的 threadsafety都为1，此值只有在creator.threadsafety &gt; 1时设置才有效，否则创建的都是dedicated connection，即此连接是线程专用的。</span></span><br><span class="line">        blocking=<span class="keyword">True</span>,  <span class="comment"># 连接池中如果没有可用连接后，是否阻塞等待。True，等待；False，不等待然后报错</span></span><br><span class="line">        maxusage=<span class="keyword">None</span>,  <span class="comment"># 一个连接最多被重复使用的次数，None表示无限制</span></span><br><span class="line">        setsession=[<span class="string">"set autocommit=1"</span>],  <span class="comment"># 开始会话前执行的命令列表。如：["set datestyle to ...", "set time zone ..."]；务必要设置autocommit，否则可能导致该session的sql未提交</span></span><br><span class="line">        ping=<span class="number">1</span>,  <span class="comment"># 每次从pool中取连接时ping一次检查可用性</span></span><br><span class="line">        reset=<span class="keyword">False</span>,  <span class="comment"># 每次将连接放回pool时，将未提交的内容回滚；False时只对事务操作进行回滚</span></span><br><span class="line">        **db_conf</span><br><span class="line">    )</span><br><span class="line"></span><br><span class="line">    try_insert()</span><br></pre></td></tr></table></figure>
+<a id="more"></a>
+<p>同时分析dbutils的关键源码:</p>
+<ul>
+<li>PooledDB：代表线程池，负责控制连接的数量、达到上限时是否阻塞、取出连接、放回连接等连接管理层面的工作。</li>
+<li>PooledDedicatedDBConnection：池专用连接的辅助代理类，调用pooledDB.connection()时，返回的就是这个链接。它保存了底层连接SteadyDBConnection，调用PooledDedicatedDBConnection的任何方法，除了close，都会直接调用SteadyDBConnection对应的方法。</li>
+<li>SteadyDBConnection：稳定数据库连接，负责封装驱动层面（如pymql）的数据库连接、创建数据库连接、执行数据库连接的ping方法、执行execute方法。</li>
+</ul>
+<p>SteadyDBConnection的<code>_ping_check()</code>方法有重连机制，对这部分源码添加debug信息帮助排查问题：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">_ping_check</span><span class="params">(self, ping=<span class="number">1</span>, reconnect=True)</span>:</span></span><br><span class="line">    <span class="string">"""Check whether the connection is still alive using ping().</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    If the the underlying connection is not active and the ping</span></span><br><span class="line"><span class="string">    parameter is set accordingly, the connection will be recreated</span></span><br><span class="line"><span class="string">    unless the connection is currently inside a transaction.</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    """</span></span><br><span class="line">    <span class="keyword">if</span> ping &amp; self._ping:</span><br><span class="line">        <span class="keyword">try</span>: <span class="comment"># if possible, ping the connection</span></span><br><span class="line">            my_reconnect = <span class="keyword">True</span></span><br><span class="line">            alive = self._con.ping(reconnect=my_reconnect)</span><br><span class="line">            <span class="comment"># 源码为: alive = self._con.ping() </span></span><br><span class="line">            <span class="comment"># print "try to ping by pymysql(reconnect=&#123;0&#125;)".format(my_reconnect)</span></span><br><span class="line">            <span class="comment"># my_reconnect = False</span></span><br><span class="line">            <span class="comment"># try:</span></span><br><span class="line">            <span class="comment">#     print "try to ping by pymysql(reconnect=&#123;0&#125;)".format(my_reconnect)</span></span><br><span class="line">            <span class="comment">#     alive = self._con.ping(False)  # do not reconnect</span></span><br><span class="line">            <span class="comment"># except TypeError:</span></span><br><span class="line">            <span class="comment">#     print "try to ping by pymysql(reconnect=&#123;0&#125;) did not have ping(False)".format(my_reconnect)</span></span><br><span class="line">            <span class="comment">#     alive = self._con.ping()</span></span><br><span class="line">        <span class="keyword">except</span> (AttributeError, IndexError, TypeError, ValueError):</span><br><span class="line">            <span class="keyword">print</span> <span class="string">"ping method is not available"</span></span><br><span class="line">            self._ping = <span class="number">0</span> <span class="comment"># ping() is not available</span></span><br><span class="line">            alive = <span class="keyword">None</span></span><br><span class="line">            reconnect = <span class="keyword">False</span></span><br><span class="line">        <span class="keyword">except</span> Exception,e :</span><br><span class="line">            <span class="keyword">print</span> <span class="string">"try to ping by pymysql(reconnect=&#123;0&#125;) fail"</span>.format(my_reconnect)</span><br><span class="line">            alive = <span class="keyword">False</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">if</span> alive <span class="keyword">is</span> <span class="keyword">None</span>:</span><br><span class="line">                alive = <span class="keyword">True</span></span><br><span class="line">            <span class="keyword">if</span> alive:</span><br><span class="line">                reconnect = <span class="keyword">False</span></span><br><span class="line">            <span class="keyword">print</span> <span class="string">"try to ping by pymysql(reconnect=&#123;0&#125;) success"</span>.format(my_reconnect)</span><br><span class="line">        <span class="keyword">if</span> reconnect <span class="keyword">and</span> <span class="keyword">not</span> self._transaction:</span><br><span class="line">            <span class="keyword">try</span>: <span class="comment"># try to reopen the connection</span></span><br><span class="line">                <span class="keyword">print</span> <span class="string">"try to reconnect by dbutils"</span></span><br><span class="line">                con = self._create()</span><br><span class="line">            <span class="keyword">except</span> Exception:</span><br><span class="line">                <span class="keyword">print</span> <span class="string">"try to reconnect by dbutils fail"</span></span><br><span class="line">                <span class="keyword">pass</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                <span class="keyword">print</span> <span class="string">"try to reconnect by dbutils success"</span></span><br><span class="line">                self._close()</span><br><span class="line">                self._store(con)</span><br><span class="line">                alive = <span class="keyword">True</span></span><br><span class="line">        <span class="keyword">return</span> alive</span><br></pre></td></tr></table></figure>
+<p>分别修改myreconnect的值进行测试：</p>
+<ul>
+<li>测试1：my_reconnect=True（对于pymysql的ping默认值为True），运行demo期间重启数据库。</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">异常开始：</span><br><span class="line">try to ping by pymysql(reconnect=True)</span><br><span class="line">try to ping by pymysql(reconnect=True) fail</span><br><span class="line">try to reconnect by dbutils</span><br><span class="line">try to reconnect by dbutils fail</span><br><span class="line"></span><br><span class="line">异常恢复：</span><br><span class="line">try to ping by pymysql(reconnect=True)</span><br><span class="line">try to ping by pymysql(reconnect=True) success</span><br><span class="line"></span><br><span class="line">恢复后，不能入库</span><br></pre></td></tr></table></figure>
+<ul>
+<li>测试2：my_reconnect=False，运行demo期间重启数据库。</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">异常开始：</span><br><span class="line">try to ping by pymysql(reconnect=False)</span><br><span class="line">try to ping by pymysql(reconnect=False) fail</span><br><span class="line">try to reconnect by dbutils</span><br><span class="line">try to reconnect by dbutils fail</span><br><span class="line"></span><br><span class="line">异常恢复：</span><br><span class="line">try to ping by pymysql(reconnect=False)</span><br><span class="line">try to ping by pymysql(reconnect=False) fail</span><br><span class="line">try to reconnect by dbutils</span><br><span class="line">try to reconnect by dbutils success</span><br><span class="line"></span><br><span class="line">恢复后，能够入库</span><br></pre></td></tr></table></figure>
+<p>经过调试发现，pymysql的ping方法默认情况会进行重连，而不是dbutils的重连。所以在dbuitils的<code>_ping_check</code>方法的重连机制有几率会不执行，因为pymysql的ping已经重连了，从而导致 setsession 中的配置没有在拿连接的时候设置进去。</p>
+<p>原因总结：</p>
+<ol>
+<li>pymysl的ping有个默认参数reconect，并且为true，即reconnect=True</li>
+<li>dbutils的ping机制依赖于pymysql原生的ping，并且默认不设置任何参数，即在目前版本的dbutil下其ping默认会自动reconnect</li>
+<li>dbutils的ping默认调用时机：只要从pool中拿连接就会进行ping</li>
+<li>始化PooledDB时，通过setsession参数的方式，设置自动commit，即 setsession=[“set autocommit=1”]。因此只要是从dbutil拿连接的时候，都会预先配置该session，即执行业务sql前，先执行setsession的内容</li>
+<li>在连接丢失或者其他异常时，由于pymysql的ping默认进行重连，故dbutils层面无法感知已经重连，setsession也不会再次执行，故后续该连接执行的sql不会进行commit。</li>
+<li>这是个bug，已经提issue给dbutils的作者，在最近的版本会修复这个bug。问题的重现以及修复方法详见：<a href="https://github.com/Cito/DBUtils/issues/23" target="_blank" rel="noopener">When use pymsql driver, the setsession params for PooledDB is not work after mysql server restart</a></li>
+</ol>
+<h2 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h2><p>在dbutils未修复该bug前，可以通过PoolDB的kwargs参数透传{“autocommit”:True}到pymysql中，这样即使通过pymysql的ping方法重连的连接也会保留自动提交的功能。</p>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        
+          
+        
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+            <a href="/tags/python/" rel="tag"># python</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/12/22/Spark学习系列之二：rdd分区数量分析.html" rel="next" title="Spark学习系列之二：rdd分区数量分析">
+                <i class="fa fa-chevron-left"></i> Spark学习系列之二：rdd分区数量分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2020/01/02/Spark学习系列之三：join的宽依赖vs-窄依赖.html" rel="prev" title="Spark学习系列之三：join的宽依赖vs.窄依赖">
+                Spark学习系列之三：join的宽依赖vs.窄依赖 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Long</p>
+              <div class="site-description motion-element" itemprop="description"></div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">16</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#线上情景"><span class="nav-number">1.</span> <span class="nav-text">线上情景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#调研原因"><span class="nav-number">2.</span> <span class="nav-text">调研原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#解决方案"><span class="nav-number">3.</span> <span class="nav-text">解决方案</span></a></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Long</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+    
+    
+      
+    
+  
+  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=3.4.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.2.0"></script>
+
+  <script src="/js/motion.js?v=7.2.0"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.2.0"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.2.0"></script>
+<script src="/js/post-details.js?v=7.2.0"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.2.0"></script>
+
+
+  
+
+  
+
+  
+
+  
+
+
+  
+
+
+  
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

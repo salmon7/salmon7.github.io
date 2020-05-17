@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+<link rel="stylesheet" href="/css/main.css?v=7.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: false,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="dockerfileCOPY VS. ADD ADD支持从本地tar文件复制解压，tar文件内的根目录应该包含dockerfile，并且context也限定为tar内部，通常配合docker build 使用，如 docker build - &amp;lt; archive.tar.gz ADD支持url获取，COPY不支持。当使用 docker build - &amp;lt; somefile 传入dock">
+<meta name="keywords" content="docker,gitlabci">
+<meta property="og:type" content="article">
+<meta property="og:title" content="gitlab ci &amp;&amp; docker-compose(2)-dockerfile的使用">
+<meta property="og:url" content="http://blog.zhang7long.com/2018/09/16/gitlab-ci-docker-compose(2)-dockerfile的使用.html">
+<meta property="og:site_name" content="keep running">
+<meta property="og:description" content="dockerfileCOPY VS. ADD ADD支持从本地tar文件复制解压，tar文件内的根目录应该包含dockerfile，并且context也限定为tar内部，通常配合docker build 使用，如 docker build - &amp;lt; archive.tar.gz ADD支持url获取，COPY不支持。当使用 docker build - &amp;lt; somefile 传入dock">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2020-05-17T06:32:49.289Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="gitlab ci &amp;&amp; docker-compose(2)-dockerfile的使用">
+<meta name="twitter:description" content="dockerfileCOPY VS. ADD ADD支持从本地tar文件复制解压，tar文件内的根目录应该包含dockerfile，并且context也限定为tar内部，通常配合docker build 使用，如 docker build - &amp;lt; archive.tar.gz ADD支持url获取，COPY不支持。当使用 docker build - &amp;lt; somefile 传入dock">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="http://blog.zhang7long.com/2018/09/16/gitlab-ci-docker-compose(2)-dockerfile的使用">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>gitlab ci && docker-compose(2)-dockerfile的使用 | keep running</title>
+  
+
+
+
+
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">keep running</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2018/09/16/gitlab-ci-docker-compose(2)-dockerfile的使用.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">gitlab ci && docker-compose(2)-dockerfile的使用
+
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-09-16 23:01:21" itemprop="dateCreated datePublished" datetime="2018-09-16T23:01:21+08:00">2018-09-16</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="dockerfile"><a href="#dockerfile" class="headerlink" title="dockerfile"></a>dockerfile</h2><h3 id="COPY-VS-ADD"><a href="#COPY-VS-ADD" class="headerlink" title="COPY VS. ADD"></a>COPY VS. ADD</h3><ul>
+<li>ADD支持从本地tar文件复制解压，tar文件内的根目录应该包含dockerfile，并且context也限定为tar内部，通常配合docker build 使用，如 docker build - &lt; archive.tar.gz</li>
+<li>ADD支持url获取，COPY不支持。当使用 docker build - &lt; somefile 传入dockerfile时，没有context可用，只能使用ADD从一个URL获取context</li>
+<li>ADD的最佳用途是将本地tar文件自动提取到image中，如 ADD rootfs.tar.xz / 。</li>
+<li>它们都是based context，不能复制context之外的东西</li>
+<li>区别：<a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#add-or-copy" target="_blank" rel="noopener">https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#add-or-copy</a></li>
+</ul>
+<h3 id="CMD-VS-ENTRYPOINT"><a href="#CMD-VS-ENTRYPOINT" class="headerlink" title="CMD VS. ENTRYPOINT"></a>CMD VS. ENTRYPOINT</h3><h4 id="CMD："><a href="#CMD：" class="headerlink" title="CMD："></a>CMD：</h4><ul>
+<li>The CMD instruction should be used to run the software contained by your image, along with any arguments. Indeed, this form of the instruction is recommended for any service-based image. like:<ul>
+<li>CMD [“executable”, “param1”, “param2”…]</li>
+<li>CMD [“apache2”,”-DFOREGROUND”]</li>
+</ul>
+</li>
+<li>CMD命令还用在交互式的shell中，如bash，python，perl。例如以下几个用法。 使用这种方式的好处是你能够执行如  docker run -it python 就能直接进入到一个有用的shell中。<ul>
+<li>CMD [“perl”, “-de0”], CMD [“python”], or CMD [“php”, “-a”]</li>
+</ul>
+</li>
+<li>CMD命令很少以 CMD [“param”, “param”] 的出现，这种用法是为了配合 ENTRYPOINT 使用的，所以不要轻易使用这种方式，除非你和你的目标用户清楚ENTRYPOINT是如何工作的</li>
+</ul>
+<h4 id="ENTRYPOINT"><a href="#ENTRYPOINT" class="headerlink" title="ENTRYPOINT:"></a>ENTRYPOINT:</h4><ul>
+<li>ENTRYPOINT的最佳实践是，设置一个主要命令，使得运行image就像运行一个命令一样</li>
+<li>假如有一个image定义了s3cmd命令，ENRTRYPOINT和CMD如下<ul>
+<li>ENTRYPOINT [“s3cmd”]</li>
+<li>CMD [“–help”]</li>
+<li>那么如果直接运行 docker run s3cmd 的话，将会显示 s3cmd 的帮助提示</li>
+<li>或者提供一个参数再执行命令，docker run s3cmd ls s3://mybucket，将会覆盖CMD的–help参数</li>
+</ul>
+</li>
+<li>当然ENTRYPOINT也可以是一个sh脚本，可以自定义解析docker run 的时候传入的命令参数</li>
+<li>配置容器启动后执行的命令，并且不可被 docker run 提供的参数覆盖</li>
+</ul>
+<a id="more"></a>
+<h4 id="CMD和ENTRYPOINT联合使用："><a href="#CMD和ENTRYPOINT联合使用：" class="headerlink" title="CMD和ENTRYPOINT联合使用："></a>CMD和ENTRYPOINT联合使用：</h4><ul>
+<li>ENTRYPOINT为exec模式时，才能够指定CMD参数和docker run时的参数；</li>
+<li>ENTRYPOINT为shell模式时，CMD参数和docker run的参数都将失效。</li>
+<li>ENTRYPOINT提供默认运行的命令，也可以包含默认的参数</li>
+<li>dockerfile中的CMD提供的默认参数，并且如果在docker run 的时候传入了对应的命令（这时命令应该被理解为参数），则会覆盖CMD的默认参数，添加到ENTRYPOINT后面    </li>
+</ul>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><p>CMD</p>
+<ul>
+<li>一般使用exec模式</li>
+<li>使用shell模式时，将会默认在命令亲前面加上 /bin/sh -c，如 /bin/bash -c “echo $HOME”</li>
+<li>如果要解析主机的环境变量，则要在docker run的时候替换dockerfile中默认的命令</li>
+<li>如果要解析container的环境变量，则要在dockerfile中使用CMD的shell模式，如executable param1 param2，或者在正常exec模式加上”sh”,”-c”，然后具体命令参数只添加到list中的一个参数中，如[“sh”, “-c”, “executable param1 param2”]，</li>
+</ul>
+<p>ENTRYPOINTV</p>
+<ul>
+<li>一般使用exec模式<ul>
+<li>只有exec模式才能与CMD联合使用</li>
+<li>shell模式将会忽略dockerfile中的CMD和docker run时指定的参数</li>
+</ul>
+</li>
+<li>如果要使用shell模式，请使用exec来启动命令，如果不加exec将会默认在命令亲前面加上 /bin/sh -c。要确保docker stop能给任何长时间运行的ENTRYPOINT可执行文件正确发出信号，需要记住用 <em>exec</em> 启动它，如 ENTRYPOINT exec executable param1 param2。</li>
+<li>如果使用–entrypoint覆盖默认的ENTRYPOINT，则–entrypoint也必须为exec模式（将不会在命令前添加sh -c），需要注意的是entrypoint只能为一个命令或者shell脚本，不能包含任何参数，参数应该为docker run指定的参数。使用–entrypoint覆盖默认ENTRYPOINT的同时，dockerfile中的CMD也失效，CMD不再作为默认的参数</li>
+</ul>
+<h3 id="context"><a href="#context" class="headerlink" title="context:"></a>context:</h3><ul>
+<li>在执行docker build PATH的时候，PATH即为context，并且PATH目录默认应该有dockerfile文件</li>
+<li>当然也可以使用 -f 指定dockerfile，但是PATH依然是context的唯一依据</li>
+</ul>
+<h3 id="EXPOSE"><a href="#EXPOSE" class="headerlink" title="EXPOSE:"></a>EXPOSE:</h3><ul>
+<li>EXPOSE指令通知Docker容器在运行时侦听指定的网络端口</li>
+</ul>
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考:"></a>参考:</h3><p>dockfile最佳实践：<a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#cmd" target="_blank" rel="noopener">https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#cmd</a></p>
+<p>ci的默认变量：<a href="https://docs.gitlab.com/ce/ci/variables/README.html" target="_blank" rel="noopener">https://docs.gitlab.com/ce/ci/variables/README.html</a></p>
+<p>dockerfile引用参考：<a href="https://docs.docker.com/engine/reference/builder/" target="_blank" rel="noopener">https://docs.docker.com/engine/reference/builder/</a></p>
+<p>ENTRYPOINT和CMD的联合使用：<a href="https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact" target="_blank" rel="noopener">https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact</a></p>
+<p>sudo or gosu：<a href="https://segmentfault.com/a/1190000004527476" target="_blank" rel="noopener">https://segmentfault.com/a/1190000004527476</a></p>
+<p>What does set -e and exec “$@” do for docker entrypoint scripts?：<a href="https://stackoverflow.com/questions/39082768/what-does-set-e-and-exec-do-for-docker-entrypoint-scripts" target="_blank" rel="noopener">https://stackoverflow.com/questions/39082768/what-does-set-e-and-exec-do-for-docker-entrypoint-scripts</a></p>
+<p>bash 内置命令exec （重要！！）：<a href="https://www.cnblogs.com/gandefeng/p/7106742.html" target="_blank" rel="noopener">https://www.cnblogs.com/gandefeng/p/7106742.html</a></p>
+<p>docker run –entrypoint如何添加参数：<a href="https://docs.docker.com/engine/reference/run/#entrypoint-default-command-to-execute-at-runtime" target="_blank" rel="noopener">https://docs.docker.com/engine/reference/run/#entrypoint-default-command-to-execute-at-runtime</a></p>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        
+          
+        
+        <div class="post-tags">
+          
+            <a href="/tags/docker/" rel="tag"># docker</a>
+          
+            <a href="/tags/gitlabci/" rel="tag"># gitlabci</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/09/16/effective-go-learning-1.html" rel="next" title="effective go learning">
+                <i class="fa fa-chevron-left"></i> effective go learning
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/09/18/gitlab-ci-docker-compose(3)-mysql的初始化.html" rel="prev" title="gitlab ci && docker-compose(3)-mysql的初始化">
+                gitlab ci && docker-compose(3)-mysql的初始化 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Long</p>
+              <div class="site-description motion-element" itemprop="description"></div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">16</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#dockerfile"><span class="nav-number">1.</span> <span class="nav-text">dockerfile</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#COPY-VS-ADD"><span class="nav-number">1.1.</span> <span class="nav-text">COPY VS. ADD</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CMD-VS-ENTRYPOINT"><span class="nav-number">1.2.</span> <span class="nav-text">CMD VS. ENTRYPOINT</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#CMD："><span class="nav-number">1.2.1.</span> <span class="nav-text">CMD：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ENTRYPOINT"><span class="nav-number">1.2.2.</span> <span class="nav-text">ENTRYPOINT:</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CMD和ENTRYPOINT联合使用："><span class="nav-number">1.2.3.</span> <span class="nav-text">CMD和ENTRYPOINT联合使用：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#小结"><span class="nav-number">1.2.4.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#context"><span class="nav-number">1.3.</span> <span class="nav-text">context:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#EXPOSE"><span class="nav-number">1.4.</span> <span class="nav-text">EXPOSE:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#参考"><span class="nav-number">1.5.</span> <span class="nav-text">参考:</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Long</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+    
+    
+      
+    
+  
+  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=3.4.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.2.0"></script>
+
+  <script src="/js/motion.js?v=7.2.0"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.2.0"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.2.0"></script>
+<script src="/js/post-details.js?v=7.2.0"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.2.0"></script>
+
+
+  
+
+  
+
+  
+
+  
+
+
+  
+
+
+  
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

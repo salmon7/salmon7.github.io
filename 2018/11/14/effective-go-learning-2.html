@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+<link rel="stylesheet" href="/css/main.css?v=7.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: false,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="从Two-dimensional slices开始，使用中文版的effctive_go学习https://www.kancloud.cn/kancloud/effective/72207 Data：二维切片: Go的数组和切片都是一维的。要创建等价的二维数组或者切片，需要定义一个数组的数组或者切片的切片。  Maps: Map是一种方便，强大的内建数据结构，其将一个类型的值（key）与另一个类型的">
+<meta name="keywords" content="go">
+<meta property="og:type" content="article">
+<meta property="og:title" content="effective go learning 2">
+<meta property="og:url" content="http://blog.zhang7long.com/2018/11/14/effective-go-learning-2.html">
+<meta property="og:site_name" content="keep running">
+<meta property="og:description" content="从Two-dimensional slices开始，使用中文版的effctive_go学习https://www.kancloud.cn/kancloud/effective/72207 Data：二维切片: Go的数组和切片都是一维的。要创建等价的二维数组或者切片，需要定义一个数组的数组或者切片的切片。  Maps: Map是一种方便，强大的内建数据结构，其将一个类型的值（key）与另一个类型的">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2020-05-17T06:32:49.288Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="effective go learning 2">
+<meta name="twitter:description" content="从Two-dimensional slices开始，使用中文版的effctive_go学习https://www.kancloud.cn/kancloud/effective/72207 Data：二维切片: Go的数组和切片都是一维的。要创建等价的二维数组或者切片，需要定义一个数组的数组或者切片的切片。  Maps: Map是一种方便，强大的内建数据结构，其将一个类型的值（key）与另一个类型的">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="http://blog.zhang7long.com/2018/11/14/effective-go-learning-2">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>effective go learning 2 | keep running</title>
+  
+
+
+
+
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">keep running</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2018/11/14/effective-go-learning-2.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">effective go learning 2
+
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-11-14 01:10:09" itemprop="dateCreated datePublished" datetime="2018-11-14T01:10:09+08:00">2018-11-14</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>从Two-dimensional slices开始，使用中文版的effctive_go学习<br><a href="https://www.kancloud.cn/kancloud/effective/72207" target="_blank" rel="noopener">https://www.kancloud.cn/kancloud/effective/72207</a></p>
+<h2 id="Data："><a href="#Data：" class="headerlink" title="Data："></a>Data：</h2><h3 id="二维切片"><a href="#二维切片" class="headerlink" title="二维切片:"></a>二维切片:</h3><ul>
+<li>Go的数组和切片都是一维的。要创建等价的二维数组或者切片，需要定义一个数组的数组或者切片的切片。</li>
+</ul>
+<h3 id="Maps"><a href="#Maps" class="headerlink" title="Maps:"></a>Maps:</h3><ul>
+<li>Map是一种方便，强大的内建数据结构，其将一个类型的值（key）与另一个类型的值（element或value） 关联一起。</li>
+<li>key可以为任何 <strong>定义了等于操作符</strong> 的类型，例如整数，浮点和复数，字符串，指针，接口（只要其动态类型支持等于操作），结构体和数组。</li>
+<li><strong>切片不能 作为map的key，因为它们没有定义等于操作</strong>。和切片类似，<strong>map持有对底层数据结构的引用。如果将map传递给函数，其对map的内容做了改变，则这些改变对于调用者是可见的</strong>。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">attended := <span class="keyword">map</span>[<span class="keyword">string</span>]<span class="keyword">bool</span>&#123;</span><br><span class="line">    <span class="string">"Ann"</span>: <span class="literal">true</span>,</span><br><span class="line">    <span class="string">"Joe"</span>: <span class="literal">true</span>,</span><br><span class="line">    ...&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> attended[person] &#123; <span class="comment">// will be false if person is not in the map</span></span><br><span class="line">    fmt.Println(person, <span class="string">"was at the meeting"</span>)&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果只测试是否在map中存在，而不关心实际的值，你可以将通常使用变量的地方换成空白标识符（_）</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">_, present := timeZone[tz]</span><br></pre></td></tr></table></figure>
+<ul>
+<li>要删除一个map项，使用delete内建函数，其参数为map和要删除的key。即使key已经不在map中，这样做也是安全的。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">delete</span>(timeZone, <span class="string">"PDT"</span>)  <span class="comment">// Now on Standard Time</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li><strong>map不太好判断是否存在某个key，如果key不存在返回的对应类型的零值，如果已有key的value恰好为零值会导致误判</strong></li>
+</ul>
+<h3 id="打印输出"><a href="#打印输出" class="headerlink" title="打印输出"></a>打印输出</h3><ul>
+<li>Go中的格式化打印使用了与C中printf家族类似的风格，不过更加丰富和通用。这些函数位于fmt程序包中，并具有大写的名字：fmt.Printf，fmt.Fprintf，fmt.Sprintf等等。字符串函数（Sprintf等）返回一个字符串，而不是填充到提供的缓冲里。</li>
+<li>你不需要提供一个格式串。对每个Printf，Fprintf和Sprintf，都有另外一对相应的函数，例如Print和Println。这些函数不接受格式串，而是为每个参数生成一个缺省的格式。Println版本还会在参数之间插入一个空格，并添加一个换行，而Print版本只有当两边的操作数都不是字符串的时候才增加一个空格。在这个例子中，每一行都会产生相同的输出。</li>
+<li>格式化打印函数fmt.Fprint等，接受的第一个参数为任何一个实现了io.Writer接口的对象；变量os.Stdout和os.Stderr是常见的实例。</li>
+<li>如果只是想要缺省的转换，像十进制整数，你可以使用 <strong>通用格式%v（代表“value”）</strong>；这正是Print和Println所产生的结果。而且，这个格式可以打印任意的的值，甚至是数组，切片，结构体和map。</li>
+<li>当打印一个结构体时，带修饰的格式 <strong>%+v会将结构体的域使用它们的名字进行注解</strong>，对于任意的值，格式%#v会按照完整的Go语法打印出该值。</li>
+<li>还可以通过 <strong>%q</strong> 来实现带引号的字符串格式，用于类型为 <strong>string或[]byte</strong> 的值。格式 <strong>%#q</strong> 将尽可能的使用反引号。（格式%q还用于整数和符文，产生一个带单引号的符文常量。）</li>
+<li><strong>%x</strong> 用于字符串，字节数组和字节切片，以及整数，生成一个 <strong>长的十六进制字符串</strong>，并且如果在格式中 <strong>有一个空格（% x）</strong>，其将会在 <strong>字节中插入空格</strong>。</li>
+<li>不要在Sprintf里面调用接收者的String方法，否则会造成无穷递归，如下。只有%s匹配才会调用MyString的String方法</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> MyString <span class="keyword">string</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(m MyString)</span> <span class="title">String</span><span class="params">()</span> <span class="title">string</span></span> &#123;</span><br><span class="line">    <span class="keyword">return</span> fmt.Sprintf(<span class="string">"MyString=%s"</span>, m) <span class="comment">// Error: will recur forever.</span></span><br><span class="line"><span class="comment">//    return fmt.Sprintf("MyString=%s", string(m)) // OK: note conversion.</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>另一种打印技术，是将一个打印程序的参数直接传递给另一个这样的程序。Printf的签名使用了类型…interface{}作为最后一个参数，来指定在格式之后可以出现任意数目的（任意类型的）参数。</li>
+</ul>
+<h3 id="append内建函数"><a href="#append内建函数" class="headerlink" title="append内建函数:"></a>append内建函数:</h3><ul>
+<li>其中T为任意给定类型的占位符。你在Go中是无法写出一个类型T由调用者来确定的函数。这就是为什么append是内建的：它需要编译器的支持。append所做的事情是将元素添加到切片的结尾，并返回结果。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">append</span><span class="params">(slice []T, elements ...T)</span> []<span class="title">T</span></span></span><br><span class="line"><span class="function"></span></span><br><span class="line"><span class="function"><span class="title">x</span> := []<span class="title">int</span></span>&#123;<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>&#125;</span><br><span class="line">x = <span class="built_in">append</span>(x, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>)</span><br><span class="line">fmt.Println(x)</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果想要在append中把一个slice添加到另一个slice要怎么做？在调用点使用 “…”，</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">x := []<span class="keyword">int</span>&#123;<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>&#125;</span><br><span class="line">y := []<span class="keyword">int</span>&#123;<span class="number">4</span>,<span class="number">5</span>,<span class="number">6</span>&#125;</span><br><span class="line">x = <span class="built_in">append</span>(x, y...)</span><br><span class="line">fmt.Println(x)</span><br></pre></td></tr></table></figure>
+<ul>
+<li>可以看出 “…” 的作用是，把一个slice转为对应的type，作为一个参数列表进行传递</li>
+</ul>
+<a id="more"></a>
+<h2 id="初始化："><a href="#初始化：" class="headerlink" title="初始化："></a>初始化：</h2><h3 id="常量"><a href="#常量" class="headerlink" title="常量:"></a>常量:</h3><ul>
+<li>在编译时被创建，即使被定义为函数局部的也如此，并且只能是数字，字符（符文），字符串或者布尔类型。</li>
+<li>由于编译时的限制，定义它们的表达式必须为能被编译器求值的常量表达式。例如，1&lt;&lt;3是一个常量表达式，而math.Sin(math.Pi/4)不是，因为函数调用math.Sin需要在运行时才发生.</li>
+<li>在Go中，枚举常量使用iota枚举器来创建。由于iota可以为表达式的一部分，并且表达式可以被隐式的重复，所以很容易创建复杂的值集。</li>
+<li>Sprintf只有当想要一个字符串的时候，才调用String方法，而%f是想要一个浮点值。</li>
+</ul>
+<h3 id="init函数"><a href="#init函数" class="headerlink" title="init函数:"></a>init函数:</h3><ul>
+<li>init是在 <strong>程序包中所有变量声明都被初始化</strong>，以及所有 <strong>被导入的程序包中的变量初始化之后才被调用</strong>。</li>
+</ul>
+<h2 id="方法："><a href="#方法：" class="headerlink" title="方法："></a>方法：</h2><h3 id="指针-vs-值"><a href="#指针-vs-值" class="headerlink" title="指针 vs. 值:"></a>指针 vs. 值:</h3><ul>
+<li>关于接收者对指针和值的规则是这样的，值方法可以在指针和值上进行调用，而指针方法只能在指针上调用。</li>
+<li>这是因为指针方法可以修改接收者；使用拷贝的值来调用它们，将会导致那些修改会被丢弃。</li>
+</ul>
+<h2 id="接口和其他类型："><a href="#接口和其他类型：" class="headerlink" title="接口和其他类型："></a>接口和其他类型：</h2><h3 id="接口"><a href="#接口" class="headerlink" title="接口:"></a>接口:</h3><ul>
+<li>类型可以实现多个接口。例如，如果一个集合实现了sort.Interface，其包含Len()，Less(i, j int) bool和Swap(i, j int)，那么它就可以通过程序包sort中的程序来进行排序，同时它还可以有一个自定义的格式器。</li>
+</ul>
+<h3 id="转换"><a href="#转换" class="headerlink" title="转换:"></a>转换:</h3><ul>
+<li>因为如果我们忽略类型名字，这两个类型（Sequence和[]int）是相同的，在它们之间进行转换是合法的。该转换并不创建新的值，只不过是暂时使现有的值具有一个新的类型。（<strong>有其它的合法转换，像整数到浮点，是会创建新值的</strong>。）</li>
+<li>将表达式的类型进行转换，来访问不同的方法集合，这在Go程序中是一种常见用法。例如，我们可以使用已有类型sort.IntSlice来将整个例子简化成这样：</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Sequence []<span class="keyword">int</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Method for printing - sorts the elements before printing</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(s Sequence)</span> <span class="title">String</span><span class="params">()</span> <span class="title">string</span></span> &#123;</span><br><span class="line">    sort.IntSlice(s).Sort()</span><br><span class="line">    <span class="keyword">return</span> fmt.Sprint([]<span class="keyword">int</span>(s))</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>现在，Sequence没有实现多个接口（排序和打印），相反的，我们利用了能够将数据项转换为多个类型（Sequence，sort.IntSlice和[]int）的能力，每个类型完成工作的一部分。这在实际中不常见，但是却可以很有效。</li>
+</ul>
+<h3 id="接口转换和类型断言："><a href="#接口转换和类型断言：" class="headerlink" title="接口转换和类型断言："></a>接口转换和类型断言：</h3><ul>
+<li>type-switch 语句</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> value <span class="keyword">interface</span>&#123;&#125; <span class="comment">// Value provided by caller.</span></span><br><span class="line"><span class="keyword">switch</span> str := value.(<span class="keyword">type</span>) &#123;</span><br><span class="line"><span class="keyword">case</span> <span class="keyword">string</span>:</span><br><span class="line">    <span class="keyword">return</span> str</span><br><span class="line"><span class="keyword">case</span> Stringer:</span><br><span class="line">    <span class="keyword">return</span> str.String()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>强制转换语句</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">str, ok := value.(<span class="keyword">string</span>)</span><br><span class="line"><span class="keyword">if</span> ok &#123;</span><br><span class="line">    fmt.Printf(<span class="string">"string value is: %q\n"</span>, str)&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    fmt.Printf(<span class="string">"value is not a string\n"</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>type-if 语句</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> str, ok := value.(<span class="keyword">string</span>); ok &#123;</span><br><span class="line">    <span class="keyword">return</span> str</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> str, ok := value.(Stringer); ok &#123;</span><br><span class="line">    <span class="keyword">return</span> str.String()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h3><ul>
+<li>如果一个类型只是用来实现接口，并且除了该接口以外没有其它被导出的方法，那就不需要导出这个类型。只导出接口，清楚地表明了其重要的是行为，而不是实现，并且其它具有不同属性的实现可以反映原始类型的行为。这也避免了对每个公共方法实例进行重复的文档介绍。</li>
+</ul>
+<h3 id="接口和方法"><a href="#接口和方法" class="headerlink" title="接口和方法:"></a>接口和方法:</h3><ul>
+<li>由于几乎任何事物都可以附加上方法，所以几乎任何事物都能够满足接口的要求。</li>
+<li>ArgServer现在具有和 <strong>HandlerFunc相同的签名</strong>，所以其可以被转换为那个类型：</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Argument server.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">ArgServer</span><span class="params">(w http.ResponseWriter, req *http.Request)</span></span> &#123;</span><br><span class="line">    fmt.Fprintln(w, os.Args)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="空白标志符："><a href="#空白标志符：" class="headerlink" title="空白标志符："></a>空白标志符：</h2><h3 id="空白标识符在多赋值语句中的使用"><a href="#空白标识符在多赋值语句中的使用" class="headerlink" title="空白标识符在多赋值语句中的使用:"></a>空白标识符在多赋值语句中的使用:</h3><ul>
+<li>空白标识符在for range循环中使用的其实是其应用在多语句赋值情况下的一个特例。</li>
+<li>一个多赋值语句需要多个左值，但假如其中某个左值在程序中并没有被使用到，那么就可以用空白标识符来占位，以避免引入一个新的无用变量。</li>
+</ul>
+<h3 id="未使用的导入和变量"><a href="#未使用的导入和变量" class="headerlink" title="未使用的导入和变量:"></a>未使用的导入和变量:</h3><ul>
+<li>如果你在程序中导入了一个 <strong>包</strong> 或声明了一个 <strong>变量</strong> 却没有使用的话,会引起编译错误。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">"fmt"</span></span><br><span class="line">    <span class="string">"io"</span></span><br><span class="line">    <span class="string">"log"</span></span><br><span class="line">    <span class="string">"os"</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">var</span> _ = fmt.Printf <span class="comment">// For debugging; delete when done.</span></span><br><span class="line"><span class="keyword">var</span> _ io.Reader    <span class="comment">// For debugging; delete when done.</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    fd, err := os.Open(<span class="string">"test.go"</span>)</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        log.Fatal(err)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// <span class="doctag">TODO:</span> use fd.</span></span><br><span class="line">    _ = fd</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>按照约定，用来临时禁止未使用导入错误的全局声明语句必须 <strong>紧随导入语句块</strong> 之后，并且需要提供相应的注释信息 —— 这些规定使得将来很容易找并删除这些语句。</li>
+</ul>
+<h3 id="副作用式导入"><a href="#副作用式导入" class="headerlink" title="副作用式导入:"></a>副作用式导入:</h3><ul>
+<li>像上面例子中的导入的包，fmt或io，最终要么被使用，要么被删除：使用空白标识符只是一种临时性的举措。但有时，导入一个包仅仅是为了引入一些副作用，而不是为了真正使用它们。</li>
+<li>例如，net/http/pprof包会在其导入阶段调用init函数，该函数注册HTTP处理程序以提供调试信息。这个包中确实也包含一些导出的API，但大多数客户端只会通过注册处理函数的方式访问web页面的数据，而不需要使用这些API。</li>
+<li>为了实现仅为副作用而导入包的操作，可以在导入语句中，将包用空白标识符进行重命名：</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> _ <span class="string">"net/http/pprof"</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>这一种非常干净的导入包的方式，由于在当前文件中，<strong>被导入的包是匿名的</strong>，因此你无法访问包内的任何符号。</li>
+</ul>
+<p>接口检查:</p>
+<ul>
+<li>一个类型不需要明确的声明它实现了某个接口。一个类型要实现某个接口，只需要实现该接口对应的方法就可以了。</li>
+<li>在实际中，多数接口的类型转换和检查都是在编译阶段静态完成的。<ul>
+<li>其中一个例子来自encoding/json包内定义的Marshaler接口。</li>
+<li>当JSON编码器接收到一个实现了Marshaler接口的参数时，就调用该参数的marshaling方法来代替标准方法处理JSON编码。编码器利用类型断言机制在运行时进行类型检查：</li>
+</ul>
+</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">m, ok := val.(json.Marshaler)</span><br></pre></td></tr></table></figure>
+<ul>
+<li>假设我们只是想知道某个类型是否实现了某个接口，而实际上并不需要使用这个接口本身 —— 例如在一段错误检查代码中 —— 那么可以使用空白标识符来忽略类型断言的返回值：</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> _, ok := val.(json.Marshaler); ok &#123;</span><br><span class="line">    fmt.Printf(<span class="string">"value %v of type %T implements json.Marshaler\n"</span>, val, val)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>在某些情况下，我们必须在包的内部确保某个类型确实满足某个接口的定义。例如类型json.RawMessage，如果它要提供一种定制的JSON格式，就必须实现json.Marshaler接口，但是编译器不会自动对其进行静态类型验证。如果该类型在实现上没有充分满足接口定义，JSON编码器仍然会工作，只不过不是用定制的方式。为了确保接口实现的正确性，可以在包内部，利用空白标识符进行一个全局声明：</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> _ json.Marshaler = (*RawMessage)(<span class="literal">nil</span>)</span><br></pre></td></tr></table></figure>
+<ul>
+<li>在该声明中，赋值语句导致了从 <strong>*RawMessage到Marshaler的类型转换</strong>，这要求 <strong>*RawMessage必须正确实现了Marshaler接口</strong> ，该属性将在编译期间被检查。当json.Marshaler接口被修改后，上面的代码将无法正确编译，因而很容易发现错误并及时修改代码。</li>
+<li>在这个结构中出现的空白标识符，表示了该声明语句仅仅是为了触发编译器进行类型检查，而非创建任何新的变量。但是，也不需要对所有满足某接口的类型都进行这样的处理。按照约定，这类声明仅当代码中没有其他静态转换时才需要使用，这类情况通常很少出现。</li>
+</ul>
+<h2 id="内嵌："><a href="#内嵌：" class="headerlink" title="内嵌："></a>内嵌：</h2><ul>
+<li>接口只能“内嵌”接口类型。</li>
+<li>在“内嵌”和“子类型”两种方法间存在一个重要的区别。当我们内嵌一个类型时，该类型的所有方法会变成外部类型的方法，但是当这些方法被调用时，其接收的参数仍然是内部类型，而非外部类型。在本例中，一个bufio.ReadWriter类型的Read方法被调用时，其效果和调用我们刚刚实现的那个Read方法是一样的，只不过前者接收的参数是ReadWriter的reader字段，而不是ReadWriter本身。</li>
+</ul>
+<h2 id="并发："><a href="#并发：" class="headerlink" title="并发："></a>并发：</h2><h3 id="以通信实现共享："><a href="#以通信实现共享：" class="headerlink" title="以通信实现共享："></a>以通信实现共享：</h3><ul>
+<li>Go语言鼓励开发者采用一种不同的方法，即将共享 变量通过Channel相互传递 —— 事实上并没有真正在不同的执行线程间共享数据 —— 的方式解决上述问题。在任意时刻，仅有一个Goroutine可以访问某个变量。数据竞争问题在设计上就被规避了。</li>
+</ul>
+<h3 id="Goroutines"><a href="#Goroutines" class="headerlink" title="Goroutines:"></a>Goroutines:</h3><ul>
+<li>每个Goroutine都对应一个非常简单的模型：它是一个并发的函数执行线索，并且在多个并发的Goroutine间，资 源是共享的。</li>
+<li>Goroutine非常轻量，创建的开销不会比栈空间分配的开销大多少。并且其初始栈空间很小 —— 这也就是它轻量的原因 —— 在后续执行中，会根据需要在堆空间分配（或释放）额外的栈空间。</li>
+<li>闭包（closure）：实现保证了在这类函数中被 <strong>引用的变量在函数结束之前不会被释放</strong>。</li>
+</ul>
+<h3 id="Channel"><a href="#Channel" class="headerlink" title="Channel:"></a>Channel:</h3><ul>
+<li>与map结构类似，channel也是通过make进行分配的，其返回值实际上是一个指向底层相关数据结构的引用。</li>
+<li>如果在创建channel时提供一个可选的整型参数，会设置该channel的缓冲区大小。该值缺省为0，用来构建默认的“无缓冲channel”，也称为“同步channel”。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ci := <span class="built_in">make</span>(<span class="keyword">chan</span> <span class="keyword">int</span>)            <span class="comment">// unbuffered channel of integers</span></span><br><span class="line">cj := <span class="built_in">make</span>(<span class="keyword">chan</span> <span class="keyword">int</span>, <span class="number">0</span>)         <span class="comment">// unbuffered channel of integers</span></span><br><span class="line">cs := <span class="built_in">make</span>(<span class="keyword">chan</span> *os.File, <span class="number">100</span>)  <span class="comment">// buffered channel of pointers to Files</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>无缓冲的channel使得通信—值的交换—和同步机制组合—共同保证了两个执行线索（Goroutines）运行于可控的状态。</li>
+<li><strong>循环的迭代变量会在循环中被重用</strong>，因此req变量会在所有Goroutine间共享。</li>
+<li>为了避免在多个goroutine中贡献变量，可以把参数用函数参数的形式传入，可以创建一个新的同名变量，如下。但它确实是合法的并且在Go中是一种惯用的方法。你可以如法泡制一个新的同名变量，用来为每个Goroutine创建循环变量的私有拷贝。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Serve</span><span class="params">(queue <span class="keyword">chan</span> *Request)</span></span> &#123;</span><br><span class="line">    <span class="keyword">for</span> req := <span class="keyword">range</span> queue &#123;</span><br><span class="line">        &lt;-sem</span><br><span class="line">        req := req <span class="comment">// Create new instance of req for the goroutine.</span></span><br><span class="line">        <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">            process(req)</span><br><span class="line">            sem &lt;- <span class="number">1</span></span><br><span class="line">        &#125;()</span><br><span class="line">    &#125;&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="Channel类型的Channel"><a href="#Channel类型的Channel" class="headerlink" title="Channel类型的Channel:"></a>Channel类型的Channel:</h3><ul>
+<li>Channel在Go语言中是一个 first-class 类型，这意味着channel可以像其他 first-class 类型变量一样进行分配、传递。该属性的一个常用方法是用来实现安全、并行的解复用（demultiplexing）处理。</li>
+</ul>
+<h3 id="并行"><a href="#并行" class="headerlink" title="并行:"></a>并行:</h3><ul>
+<li>对于用户态任务，我们默认仅提供一个物理CPU进行处理。任意数目的Goroutine可以阻塞在系统调用上，但 <strong>默认情况下，在任意时刻，只有一个Goroutine</strong> 可以被调度执行。</li>
+<li>目前，你必须通过 <strong>设置GOMAXPROCS环境变量</strong> 或者 <strong>导入runtime包并调用runtime.GOMAXPROCS(NCPU)</strong>, 来告诉Go的运行时系统最大并行执行的Goroutine数目。</li>
+<li><strong>可以通过runtime.NumCPU()</strong> 获得当前运行系统的逻辑核数，作为一个有用的参考。需要重申：上述方法可能会随我们对实现的完善而最终被淘汰。</li>
+<li>注意不要把“并发”和“并行”这两个概念搞混：“并发”是指用一些彼此独立的执行模块构建程序；而“并行”则是指通过将计算任务在多个处理器上同时执行以 提高效率。尽管对于一些问题，我们可以利用“并发”特性方便的构建一些并行的程序部件，但是Go终究是一门“并发”语言而非“并行”语言，并非所有的并行 编程模式都适用于Go语言模型。</li>
+</ul>
+<h2 id="错误："><a href="#错误：" class="headerlink" title="错误："></a>错误：</h2><ul>
+<li>向调用者返回某种形式的错误信息是库历程必须提供的一项功能。通过前面介绍的函数多返回值的特性，Go中的错误信息可以很容易同正常情况下的返回值一起返回给调用者。</li>
+<li>对于需要精确分析错误信息的调用者，可以通过类型开关或类型断言的方式查看具体的错误并深入错误的细节。就PathErrors类型而言，这些细节信息包含在一个内部的Err字段中，可以被用来进行错误恢复。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> try := <span class="number">0</span>; try &lt; <span class="number">2</span>; try++ &#123;</span><br><span class="line">    file, err = os.Create(filename)</span><br><span class="line">    <span class="keyword">if</span> err == <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> e, ok := err.(*os.PathError); ok &amp;&amp; e.Err == syscall.ENOSPC &#123;</span><br><span class="line">        deleteTempFiles()  <span class="comment">// Recover some space.</span></span><br><span class="line">        <span class="keyword">continue</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>第二个if语句是另一种形式的类型断言。如该断言失败，ok的值将为false且e的值为nil。如果断言成功，则ok值为true，说明当前的错误，也就是e，属于*os.PathError类型，因而可以进一步获取更多的细节信息。</li>
+</ul>
+<h3 id="严重故障（Panic）"><a href="#严重故障（Panic）" class="headerlink" title="严重故障（Panic）:"></a>严重故障（Panic）:</h3><ul>
+<li>通常来说，向调用者报告错误的方式就是返回一个额外的error变量： Read方法就是一个很好的例子；该方法返回一个字节计数值和一个error变量。但是对于那些不可恢复的错误，比如错误发生后程序将不能继续执行的情况，该如何处理呢？</li>
+<li>为了解决上述问题，Go语言提供了一个内置的 <strong>panic方法</strong>，用来 <strong>创建一个运行时错误并结束当前程序</strong>（关于退出机制，下一节还有进一步介绍）。该函数接受一个任意类型的参数，并在程序挂掉之前打印该参数内容，通常我们会选择一个字符串作为参数。方法panic还适用于指示一些程序中的不可达状态，比如从一个无限循环中退出。</li>
+<li>在实际的库设计中，应尽量避免使用panic。如果程序错误可以以某种方式掩盖或是绕过，那么最好还是继续执行而不是让整个程序终止。不过还是有一些反例的，比方说，如果库历程确实没有办法正确完成其初始化过程，那么触发panic退出可能就是一种更加合理的方式。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> user = os.Getenv(<span class="string">"USER"</span>)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">init</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="keyword">if</span> user == <span class="string">""</span> &#123;</span><br><span class="line">        <span class="built_in">panic</span>(<span class="string">"no value for $USER"</span>)</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="恢复（Recover）"><a href="#恢复（Recover）" class="headerlink" title="恢复（Recover）:"></a>恢复（Recover）:</h3><ul>
+<li>对于一些隐式的运行时错误，如切片索引越界、类型断言错误等情形下，panic方法就会被调用，它将 <strong>立刻中断当前函数的执行，并展开当前Goroutine的调用栈，依次执行之前注册的defer函数。当栈展开操作达到该Goroutine栈顶端时，程序将终止</strong>。但这时仍然 <strong>可以使用Go的内建recover方法重新获得Goroutine的控制权，并将程序恢复到正常执行的状态</strong>。</li>
+<li>调用recover方法会终止栈展开操作并返回之前传递给panic方法的那个参数。由于在栈展开过程中，只有defer型函数会被执行，因此recover的调用必须置于defer函数内才有效。</li>
+<li>在下面的示例应用中，调用recover方法会终止server中失败的那个Goroutine，但server中其它的Goroutine将继续执行，不受影响。</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">server</span><span class="params">(workChan &lt;-<span class="keyword">chan</span> *Work)</span></span> &#123;</span><br><span class="line">    <span class="keyword">for</span> work := <span class="keyword">range</span> workChan &#123;</span><br><span class="line">        <span class="keyword">go</span> safelyDo(work)</span><br><span class="line">    &#125;&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">safelyDo</span><span class="params">(work *Work)</span></span> &#123;</span><br><span class="line">    <span class="keyword">defer</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">if</span> err := <span class="built_in">recover</span>(); err != <span class="literal">nil</span> &#123;</span><br><span class="line">            log.Println(<span class="string">"work failed:"</span>, err)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;()</span><br><span class="line">    do(work)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>在这里例子中，如果do(work)调用发生了panic，则其结果 <strong>将被记录且发生错误的那个Goroutine将干净的退出</strong>，不会干扰其他Goroutine。你不需要在defer指示的闭包中做别的操作，仅需调用recover方法，它将帮你搞定一切。</li>
+<li>只有直接在defer函数中调用recover方法，才会返回非nil的值，因此defer函数的代码可以调用那些本身 <strong>使用了panic和recover的库函数</strong> 而不会引发错误。还用上面的那个例子说明：safelyDo里的defer函数在调用recover之前可能调用了一个日志记录函数，而日志记录程序的执行将不受panic状态的影响。（这段话的意思讨论的是，在defer函数中需要使用其他库函数时，如果该库函数也使用了panic和recover来优雅退出自身的函数调用链，那么将不会影响defer函数中panic的状态；如果未使用相关的技术，那么将会污染/影响defer函数对panic判断。recover返回空则未panic，返回非空则panic）</li>
+<li>有了错误恢复的模式，do函数及其调用的代码可以通过调用panic方法，以 <strong>一种很干净的方式从错误状态中恢复</strong>。我们可以使用该特性为那些复杂的软件实现更加简洁的错误处理代码。</li>
+<li>让我们来看下面这个例子，它是regexp包的一个简化版本，它通过调用panic并传递一个局部错误类型来报告“解析错误”（Parse Error）。下面的代码包括了Error类型定义，error处理方法以及Compile函数：</li>
+</ul>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Error is the type of a parse error; it satisfies the error interface.</span></span><br><span class="line"><span class="keyword">type</span> Error <span class="keyword">string</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(e Error)</span> <span class="title">Error</span><span class="params">()</span> <span class="title">string</span></span> &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">string</span>(e)&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// error is a method of *Regexp that reports parsing errors by// panicking with an Error.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(regexp *Regexp)</span> <span class="title">error</span><span class="params">(err <span class="keyword">string</span>)</span></span> &#123;</span><br><span class="line">    <span class="built_in">panic</span>(Error(err))&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Compile returns a parsed representation of the regular expression.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Compile</span><span class="params">(str <span class="keyword">string</span>)</span> <span class="params">(regexp *Regexp, err error)</span></span> &#123;</span><br><span class="line">    regexp = <span class="built_in">new</span>(Regexp)</span><br><span class="line">    <span class="comment">// doParse will panic if there is a parse error.</span></span><br><span class="line">    <span class="keyword">defer</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">if</span> e := <span class="built_in">recover</span>(); e != <span class="literal">nil</span> &#123;</span><br><span class="line">            regexp = <span class="literal">nil</span>    <span class="comment">// Clear return value.</span></span><br><span class="line">            err = e.(Error) <span class="comment">// Will re-panic if not a parse error.</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;()</span><br><span class="line">    <span class="keyword">return</span> regexp.doParse(str), <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果doParse方法触发panic，错误恢复代码会将返回值置为nil—因为defer函数可以修改命名的返回值变量；然后，错误恢复代码会对返回的错误类型进行类型断言，<strong>判断其是否属于Error类型</strong>。如果类型断言失败，则会引发运行时错误，并继续进行栈展开，最后终止程序 —— 这个过程将不再会被中断。类型检查失败可能意味着程序中还有其他部分触发了panic，如果某处存在索引越界访问等，因此，即使我们已经使用了panic和recover机制来处理解析错误，程序依然会异常终止。（err = e.(Err)是上面代码的关键部分，如果断言失败，则意味着不是本包有意抛出的panic，因此应该继续向上抛出直至被再次捕捉或者最终终止程序；panic(Error(err)) 这句代码对err进行了类型转换，并传入panic函数中）</li>
+<li>有了上面的错误处理过程，调用error方法（由于它是一个类型的绑定的方法，因而即使与内建类型error同名，也不会带来什么问题，甚至是一直更加自然的用法）使得“解析错误”的报告更加方便，无需费心去考虑手工处理栈展开过程的复杂问题。</li>
+<li>上面这种模式的妙处在于，<strong>它完全被封装在模块的内部</strong>，Parse方法将其 <strong>内部对panic的调用隐藏在error之中</strong>；而不会将panics信息暴露给外部使用者。这是一个 <strong>设计良好且值得学习的编程技巧</strong>。</li>
+<li>这样做的缺点是：<ul>
+<li>顺便说一下，当确实有错误发生时，我们习惯采取的“重新触发panic”（re-panic）的方法会改变panic的值。但 <strong>新旧错误信息都会出现在崩溃 报告中（上面新错误信息为： interface conversion: interface {} is xxx, not main.Error）</strong>，引发错误的原始点仍然可以找到。所以，通常这种简单的重新触发panic的机制就足够了—所有这些错误最终导致了程序的崩溃 <strong>（可以通过查阅调用栈的方式找到真正发生错误的地方）</strong>—但是如果只想显示最 初的错误信息的话，你就需要稍微多写一些代码来过滤掉那些由重新触发引入的多余信息。这个功能就留给读者自己去实现吧！</li>
+</ul>
+</li>
+</ul>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        
+          
+        
+        <div class="post-tags">
+          
+            <a href="/tags/go/" rel="tag"># go</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/09/29/go系列-中间件.html" rel="next" title="go系列-中间件">
+                <i class="fa fa-chevron-left"></i> go系列-中间件
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/11/09/浅谈golang对mysql时间类型数据转换的问题.html" rel="prev" title="浅谈golang对mysql时间类型数据转换的问题">
+                浅谈golang对mysql时间类型数据转换的问题 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Long</p>
+              <div class="site-description motion-element" itemprop="description"></div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">16</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Data："><span class="nav-number">1.</span> <span class="nav-text">Data：</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#二维切片"><span class="nav-number">1.1.</span> <span class="nav-text">二维切片:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Maps"><span class="nav-number">1.2.</span> <span class="nav-text">Maps:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#打印输出"><span class="nav-number">1.3.</span> <span class="nav-text">打印输出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#append内建函数"><span class="nav-number">1.4.</span> <span class="nav-text">append内建函数:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#初始化："><span class="nav-number">2.</span> <span class="nav-text">初始化：</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#常量"><span class="nav-number">2.1.</span> <span class="nav-text">常量:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#init函数"><span class="nav-number">2.2.</span> <span class="nav-text">init函数:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#方法："><span class="nav-number">3.</span> <span class="nav-text">方法：</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#指针-vs-值"><span class="nav-number">3.1.</span> <span class="nav-text">指针 vs. 值:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#接口和其他类型："><span class="nav-number">4.</span> <span class="nav-text">接口和其他类型：</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#接口"><span class="nav-number">4.1.</span> <span class="nav-text">接口:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#转换"><span class="nav-number">4.2.</span> <span class="nav-text">转换:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#接口转换和类型断言："><span class="nav-number">4.3.</span> <span class="nav-text">接口转换和类型断言：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#概述"><span class="nav-number">4.4.</span> <span class="nav-text">概述</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#接口和方法"><span class="nav-number">4.5.</span> <span class="nav-text">接口和方法:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#空白标志符："><span class="nav-number">5.</span> <span class="nav-text">空白标志符：</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#空白标识符在多赋值语句中的使用"><span class="nav-number">5.1.</span> <span class="nav-text">空白标识符在多赋值语句中的使用:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#未使用的导入和变量"><span class="nav-number">5.2.</span> <span class="nav-text">未使用的导入和变量:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#副作用式导入"><span class="nav-number">5.3.</span> <span class="nav-text">副作用式导入:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#内嵌："><span class="nav-number">6.</span> <span class="nav-text">内嵌：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#并发："><span class="nav-number">7.</span> <span class="nav-text">并发：</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#以通信实现共享："><span class="nav-number">7.1.</span> <span class="nav-text">以通信实现共享：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Goroutines"><span class="nav-number">7.2.</span> <span class="nav-text">Goroutines:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Channel"><span class="nav-number">7.3.</span> <span class="nav-text">Channel:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Channel类型的Channel"><span class="nav-number">7.4.</span> <span class="nav-text">Channel类型的Channel:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#并行"><span class="nav-number">7.5.</span> <span class="nav-text">并行:</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#错误："><span class="nav-number">8.</span> <span class="nav-text">错误：</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#严重故障（Panic）"><span class="nav-number">8.1.</span> <span class="nav-text">严重故障（Panic）:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#恢复（Recover）"><span class="nav-number">8.2.</span> <span class="nav-text">恢复（Recover）:</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Long</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+    
+    
+      
+    
+  
+  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=3.4.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.2.0"></script>
+
+  <script src="/js/motion.js?v=7.2.0"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.2.0"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.2.0"></script>
+<script src="/js/post-details.js?v=7.2.0"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.2.0"></script>
+
+
+  
+
+  
+
+  
+
+  
+
+
+  
+
+
+  
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

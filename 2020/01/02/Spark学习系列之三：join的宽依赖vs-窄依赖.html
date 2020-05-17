@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+<link rel="stylesheet" href="/css/main.css?v=7.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: false,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="如无特别说明，本文源码版本为 spark 2.3.4两个rdd join时产生新的rdd，是宽依赖，还是窄依赖？  join transformation 以上图片是个经常用来解释宽窄依赖的经典图，来源于论文&amp;lt;&amp;lt;Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Comp">
+<meta name="keywords" content="spark,scala">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark学习系列之三：join的宽依赖vs.窄依赖">
+<meta property="og:url" content="http://blog.zhang7long.com/2020/01/02/Spark学习系列之三：join的宽依赖vs-窄依赖.html">
+<meta property="og:site_name" content="keep running">
+<meta property="og:description" content="如无特别说明，本文源码版本为 spark 2.3.4两个rdd join时产生新的rdd，是宽依赖，还是窄依赖？  join transformation 以上图片是个经常用来解释宽窄依赖的经典图，来源于论文&amp;lt;&amp;lt;Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Comp">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://blog.zhang7long.com/2020/01/02/Spark学习系列之三：join的宽依赖vs-窄依赖/narrow_wide_dependency.png">
+<meta property="og:updated_time" content="2020-05-17T06:32:49.287Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Spark学习系列之三：join的宽依赖vs.窄依赖">
+<meta name="twitter:description" content="如无特别说明，本文源码版本为 spark 2.3.4两个rdd join时产生新的rdd，是宽依赖，还是窄依赖？  join transformation 以上图片是个经常用来解释宽窄依赖的经典图，来源于论文&amp;lt;&amp;lt;Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Comp">
+<meta name="twitter:image" content="http://blog.zhang7long.com/2020/01/02/Spark学习系列之三：join的宽依赖vs-窄依赖/narrow_wide_dependency.png">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="http://blog.zhang7long.com/2020/01/02/Spark学习系列之三：join的宽依赖vs-窄依赖">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>Spark学习系列之三：join的宽依赖vs.窄依赖 | keep running</title>
+  
+
+
+
+
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">keep running</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2020/01/02/Spark学习系列之三：join的宽依赖vs-窄依赖.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Spark学习系列之三：join的宽依赖vs.窄依赖
+
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2020-01-02 01:30:54" itemprop="dateCreated datePublished" datetime="2020-01-02T01:30:54+08:00">2020-01-02</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <blockquote>
+<p>如无特别说明，本文源码版本为 spark 2.3.4<br>两个rdd join时产生新的rdd，是宽依赖，还是窄依赖？</p>
+</blockquote>
+<h2 id="join-transformation"><a href="#join-transformation" class="headerlink" title="join transformation"></a>join transformation</h2><p><img src="/2020/01/02/Spark学习系列之三：join的宽依赖vs-窄依赖/narrow_wide_dependency.png" alt="narrow_wide_dependency.png"></p>
+<p>以上图片是个经常用来解释宽窄依赖的经典图，来源于论文&lt;&lt;Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing&gt;&gt;。以下这段话也来自与该论文：</p>
+<blockquote>
+<p>join: Joining two RDDs may lead to either two nar- row dependencies (if they are both hash/range partitioned with the same partitioner), two wide dependencies, or a mix (if one parent has a partitioner and one does not). In either case, the output RDD has a partitioner (either one inherited from the parents or a default hash partitioner)</p>
+</blockquote>
+<p>或许我们会好奇，为什么同样是join操作，有时是宽依赖，有时窄依赖？我们先从两个简单的实验开始，再从源码看其实现方式。</p>
+<h3 id="rdd1和rdd2的partitioner不同"><a href="#rdd1和rdd2的partitioner不同" class="headerlink" title="rdd1和rdd2的partitioner不同"></a>rdd1和rdd2的partitioner不同</h3><p>假设我们有rdd1和rdd2，其partitioner分别为partitioner1、partitioner2。分区器定义如下：   </p>
+<p>partitioner1：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">numPartiton = 3</span><br><span class="line">func = x mod numPartiton</span><br></pre></td></tr></table></figure>
+<p>partitioner2：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">numPartiton = 5</span><br><span class="line">func = (x  * 3) mod numPartiton</span><br></pre></td></tr></table></figure>
+<p>rdd1的初始分布如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">partition0: (0, &quot;a&quot;), (3, &quot;e&quot;)</span><br><span class="line">partition1: (1, &quot;b&quot;)</span><br><span class="line">partition2: (2, &quot;c&quot;)</span><br></pre></td></tr></table></figure>
+<p>rdd2的初始分布如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">partition0: (0, &quot;e&quot;), (0, &quot;j&quot;)</span><br><span class="line">partition1: (2, &quot;f&quot;)</span><br><span class="line">partition2: (4, &quot;g&quot;)</span><br><span class="line">partition3: (1, &quot;h&quot;), (6, &quot;k&quot;)</span><br><span class="line">partition4: (3, &quot;i&quot;)</span><br></pre></td></tr></table></figure>
+<p>rdd3=rdd2.join(rdd1)，rdd3数据分布如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">partition0: (0, (&quot;e&quot;, &quot;a&quot;)), (0, (&quot;j&quot;, &quot;a&quot;))</span><br><span class="line">partition1: (2, (&quot;f&quot;, &quot;c&quot;))</span><br><span class="line">partition2: </span><br><span class="line">partition3: (1, (&quot;h&quot;, &quot;b&quot;))</span><br><span class="line">partition4: (3, (&quot;i&quot;, &quot;e&quot;))</span><br></pre></td></tr></table></figure>
+<p>rdd3和rdd1以及rdd2的parittion之间的依赖关系如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">rdd1.partition0 ==&gt; rdd3.partition0, rdd3.partition4 </span><br><span class="line">rdd1.partition1 ==&gt; rdd3.partition3  </span><br><span class="line">rdd1.partition2 ==&gt; rdd3.partition2  </span><br><span class="line"></span><br><span class="line">rdd2.partition0 ==&gt; rdd3.partition0  </span><br><span class="line">rdd2.partition1 ==&gt; rdd3.partition1 </span><br><span class="line">rdd2.partition2 ==&gt; rdd3.partition2  </span><br><span class="line">rdd2.partition3 ==&gt; rdd3.partition3  </span><br><span class="line">rdd2.partition4 ==&gt; rdd3.partition4</span><br></pre></td></tr></table></figure>
+<p>可以看到rdd1的parittion0 同时被rdd3的partition0和partition4依赖，父rdd的一个parittion被子rdd多个parittion依赖，所以此时rdd3对rdd1的依赖为宽依赖，而对rdd2为窄依赖。</p>
+<a id="more"></a>
+<h3 id="rdd1和rdd2的partitioner相同"><a href="#rdd1和rdd2的partitioner相同" class="headerlink" title="rdd1和rdd2的partitioner相同"></a>rdd1和rdd2的partitioner相同</h3><p>我们统一rdd1和rdd2的partitioner，再观察其依赖状态。</p>
+<p>partitioner：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">numPartiton = 3</span><br><span class="line">func = x mod numPartiton</span><br></pre></td></tr></table></figure>
+<p>rdd1的初始分布如下:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">partition0: (0, &quot;a&quot;), (3, &quot;e&quot;)</span><br><span class="line">partition1: (1, &quot;b&quot;)</span><br><span class="line">partition2: (2, &quot;c&quot;)</span><br></pre></td></tr></table></figure>
+<p>rdd2的初始分布如下:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">partition0: (0, &quot;e&quot;), (0, &quot;j&quot;), (3, &quot;i&quot;), (6, &quot;k&quot;)</span><br><span class="line">partition1: (1, &quot;h&quot;), (4, &quot;g&quot;)</span><br><span class="line">partition2: (2, &quot;f&quot;)</span><br></pre></td></tr></table></figure>
+<p>rdd3=rdd2.join(rdd1)，rdd3数据分布如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">partition0: (0, (&quot;e&quot;, &quot;a&quot;)), (0, (&quot;j&quot;,&quot;a&quot;)), (3, (&quot;i&quot;, &quot;e&quot;))</span><br><span class="line">partition1: (1, (&quot;h&quot;, &quot;b&quot;))</span><br><span class="line">partition2: (2, (&quot;f&quot;, &quot;c&quot;))</span><br></pre></td></tr></table></figure>
+<p>rdd3和rdd1以及rdd2的parittion之间的依赖关系如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">rdd1.partition0 ==&gt; rdd3.partition0  </span><br><span class="line">rdd1.partition1 ==&gt; rdd3.partition1  </span><br><span class="line">rdd1.partition2 ==&gt; rdd3.partition2   </span><br><span class="line">rdd1.partition3 ==&gt; rdd3.partition3  </span><br><span class="line"></span><br><span class="line">rdd2.partition0 ==&gt; rdd3.partition0  </span><br><span class="line">rdd2.partition1 ==&gt; rdd3.partition1  </span><br><span class="line">rdd2.partition2 ==&gt; rdd3.partition2   </span><br><span class="line">rdd2.partition3 ==&gt; rdd3.partition3</span><br></pre></td></tr></table></figure>
+<p>rdd1和rdd2的每个parittion都只被rdd3的一个partition依赖，故rdd3对rdd1和rdd2的依赖为窄依赖。</p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>通过对比两种情况，可以发现当两个父rdd的partitioner相同时，根本不会发生partition间的传输。这也是合理的，因为子rdd根据key进行计算分区时，也会和当前所在分区一致。parittioner不同时，其中一个至少会发生shuffle。当两个父rdd均没有parittioner时，将会进行两次shuffle。</p>
+<h2 id="分析源码实现"><a href="#分析源码实现" class="headerlink" title="分析源码实现"></a>分析源码实现</h2><figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> org.apache.spark.rdd.<span class="type">PairRDDFunctions</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * Return an RDD containing all pairs of elements with matching keys in `this` and `other`. Each</span></span><br><span class="line"><span class="comment">   * pair of elements will be returned as a (k, (v1, v2)) tuple, where (k, v1) is in `this` and</span></span><br><span class="line"><span class="comment">   * (k, v2) is in `other`. Performs a hash join across the cluster.</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">join</span></span>[<span class="type">W</span>](other: <span class="type">RDD</span>[(<span class="type">K</span>, <span class="type">W</span>)]): <span class="type">RDD</span>[(<span class="type">K</span>, (<span class="type">V</span>, <span class="type">W</span>))] = self.withScope &#123;</span><br><span class="line">    join(other, defaultPartitioner(self, other))</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * Return an RDD containing all pairs of elements with matching keys in `this` and `other`. Each</span></span><br><span class="line"><span class="comment">   * pair of elements will be returned as a (k, (v1, v2)) tuple, where (k, v1) is in `this` and</span></span><br><span class="line"><span class="comment">   * (k, v2) is in `other`. Uses the given Partitioner to partition the output RDD.</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">join</span></span>[<span class="type">W</span>](other: <span class="type">RDD</span>[(<span class="type">K</span>, <span class="type">W</span>)], partitioner: <span class="type">Partitioner</span>): <span class="type">RDD</span>[(<span class="type">K</span>, (<span class="type">V</span>, <span class="type">W</span>))] = self.withScope &#123;</span><br><span class="line">    <span class="keyword">this</span>.cogroup(other, partitioner).flatMapValues( pair =&gt;</span><br><span class="line">      <span class="keyword">for</span> (v &lt;- pair._1.iterator; w &lt;- pair._2.iterator) <span class="keyword">yield</span> (v, w)</span><br><span class="line">    )</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * For each key k in `this` or `other`, return a resulting RDD that contains a tuple with the</span></span><br><span class="line"><span class="comment">   * list of values for that key in `this` as well as `other`.</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="function"><span class="keyword">def</span> <span class="title">cogroup</span></span>[<span class="type">W</span>](other: <span class="type">RDD</span>[(<span class="type">K</span>, <span class="type">W</span>)], partitioner: <span class="type">Partitioner</span>)</span><br><span class="line">      : <span class="type">RDD</span>[(<span class="type">K</span>, (<span class="type">Iterable</span>[<span class="type">V</span>], <span class="type">Iterable</span>[<span class="type">W</span>]))] = self.withScope &#123;</span><br><span class="line">    <span class="keyword">if</span> (partitioner.isInstanceOf[<span class="type">HashPartitioner</span>] &amp;&amp; keyClass.isArray) &#123;</span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">SparkException</span>(<span class="string">"HashPartitioner cannot partition array keys."</span>)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">val</span> cg = <span class="keyword">new</span> <span class="type">CoGroupedRDD</span>[<span class="type">K</span>](<span class="type">Seq</span>(self, other), partitioner)</span><br><span class="line">    cg.mapValues &#123; <span class="keyword">case</span> <span class="type">Array</span>(vs, w1s) =&gt;</span><br><span class="line">      (vs.asInstanceOf[<span class="type">Iterable</span>[<span class="type">V</span>]], w1s.asInstanceOf[<span class="type">Iterable</span>[<span class="type">W</span>]])</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  </span><br><span class="line">--------------</span><br><span class="line"><span class="keyword">package</span> org.apache.spark.rdd.<span class="type">CoGroupedRDD</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">getDependencies</span></span>: <span class="type">Seq</span>[<span class="type">Dependency</span>[_]] = &#123;</span><br><span class="line">    rdds.map &#123; rdd: <span class="type">RDD</span>[_] =&gt;</span><br><span class="line">      <span class="keyword">if</span> (rdd.partitioner == <span class="type">Some</span>(part)) &#123;</span><br><span class="line">        logDebug(<span class="string">"Adding one-to-one dependency with "</span> + rdd)</span><br><span class="line">        <span class="keyword">new</span> <span class="type">OneToOneDependency</span>(rdd)</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        logDebug(<span class="string">"Adding shuffle dependency with "</span> + rdd)</span><br><span class="line">        <span class="keyword">new</span> <span class="type">ShuffleDependency</span>[<span class="type">K</span>, <span class="type">Any</span>, <span class="type">CoGroupCombiner</span>](</span><br><span class="line">          rdd.asInstanceOf[<span class="type">RDD</span>[_ &lt;: <span class="type">Product2</span>[<span class="type">K</span>, _]]], part, serializer)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+<p>考虑rdd3=rdd1.join(rdd2)，什么时候会进行shuffle，什么时候不会？我们先看看rdd3=rdd1.join(rdd2) 调用栈：</p>
+<ol>
+<li>rdd1通过隐式转换为PairRDDFunctions（通过rddToPairRDDFunctions进行隐式转换）</li>
+<li>调用<code>org.apache.spark.rdd.PairRDDFunctions</code>的<code>join[W](other: RDD[(K, W)])</code>方法</li>
+<li>使用 defaultPartitioner(self, other) 获取或者创建partitioner，并调用<code>join(other, defaultPartitioner(self, other))</code>方法，defaultPartitioner的计算方法见上篇文章<code>Spark学习系列之二：rdd分区数量分析</code>。</li>
+<li>通过CoGroupedRDD[K](Seq(self, other), partitioner)创建rdd，聚合父rdd相同key到一个长度为二的数组中，每个数组的类型为Iterable，即 RDD[(K, (Iterable[V], Iterable[W]))]。</li>
+<li>在CoGroupedRDD的getDependencies中，rdds为rdd1和rdd2组成的元组，rdds.map遍历该元组： <ul>
+<li>元组中的的parittioner和defaultPartitioner返回相等时（parittioner是否相等取决其实现的equal方法，如HashPartitioner实现的equal方法只有同种类型的Partitioner，并且分区数量一致时，返回true），返回OneToOneDependency。它是NarrowDependency的实现类，代表子rdd的一个paritition只依赖父rdd的一个parittion，其实现了getParents(partitionId: Int)方法，可以根据子rdd的partitionId获取依赖父rdd的partitionId的List，并且返回的List大小为1.</li>
+<li>如果不相等，则返回ShuffleDependency。</li>
+</ul>
+</li>
+<li>综上所述，可能出现四种情况<ul>
+<li>rdd3与rdd1和rdd2均为窄依赖，rdd1和rdd2的partitioner与defaultPartitioner()返回的相等。</li>
+<li>rdd3与rdd1和rdd2均为宽依赖，rdd1和rdd2的partitioner与defaultPartitioner()返回的不相等，或者rdd1和rdd2的partitioner不存在。</li>
+<li>rdd3与rdd1为窄依赖，与rdd2为宽依赖，rdd1和与defaultPartitioner()返回的相等，rdd2和与defaultPartitioner()返回的不相等，或者rdd2的partitioner不存在。</li>
+<li>rdd3与rdd2为窄依赖，与rdd1为宽依赖，类似第3条</li>
+</ul>
+</li>
+</ol>
+<h2 id="如何知道是否会发生shuffle"><a href="#如何知道是否会发生shuffle" class="headerlink" title="如何知道是否会发生shuffle"></a>如何知道是否会发生shuffle</h2><p>一般有两个办法：</p>
+<ul>
+<li>通过dependencies，查看rdd的依赖，如果为OneToOneDenpendency、PruneDependency、RangeDependency则为窄依赖，如果为ShuffleDependency则为宽依赖。</li>
+<li>通过toDebugString查看血统中是否有ShuffledRDD。</li>
+</ul>
+<p>如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">val wordsRDD = sc.parallelize(largeList)</span><br><span class="line"></span><br><span class="line">/* dependencies */</span><br><span class="line"></span><br><span class="line">val pairs = wordsRdd.map(c=&gt;(c,1))</span><br><span class="line">                    .groupByKey</span><br><span class="line">                    .dependencies          // &lt;-------------</span><br><span class="line">// pairs: Seq[org.apache.spark.Dependency[_]] = List(org.apache.spark.ShuffleDependency@4294a23d)</span><br><span class="line"></span><br><span class="line">/* toDebugString */</span><br><span class="line"></span><br><span class="line">val pairs = wordsRdd.map(c=&gt;(c,1))</span><br><span class="line">                    .groupByKey</span><br><span class="line">                    .toDebugString         // &lt;-------------</span><br><span class="line">// pairs: String =</span><br><span class="line">// (8) ShuffledRDD[219] at groupByKey at &lt;console&gt;:38 []</span><br><span class="line">//  +-(8) MapPartitionsRDD[218] at map at &lt;console&gt;:37 []</span><br><span class="line">//     | ParallelCollectionRDD[217] at parallelize at &lt;console&gt;:36 []</span><br></pre></td></tr></table></figure>
+<p>另外一个办法是记住 <strong>可能</strong> 会发生shuffle的transformation：</p>
+<ul>
+<li>cogroup</li>
+<li>groupWith</li>
+<li>join</li>
+<li>leftOuterJoin</li>
+<li>rightOuterJoin</li>
+<li>groupByKey</li>
+<li>reduceByKey</li>
+<li>combineByKey</li>
+<li>distinct</li>
+<li>intersection</li>
+<li>repartition</li>
+<li>coalesce</li>
+<li>partitionBy</li>
+<li>sortByKey</li>
+<li>sortBy</li>
+</ul>
+<h2 id="使用分区可以避免shuffle的常见场景"><a href="#使用分区可以避免shuffle的常见场景" class="headerlink" title="使用分区可以避免shuffle的常见场景"></a>使用分区可以避免shuffle的常见场景</h2><ol>
+<li><p>运行在 <strong>预分区</strong> RDD上的reduceByKey将只会在本地计算值，只需要将最终的reduced值从worker发送到dirver。</p>
+</li>
+<li><p>在两个RDD上调用的join，这些RDD使用相同的分区器进行 <strong>预分区</strong> 并 <strong>缓存</strong> 在同一台计算机上，这将导致只在本地计算join，而不会在网络上进行shuffle。</p>
+</li>
+</ol>
+<h2 id="对常见的transformation进行分类"><a href="#对常见的transformation进行分类" class="headerlink" title="对常见的transformation进行分类"></a>对常见的transformation进行分类</h2><p>可能会对transformation的种类繁多有点难记，有些会保持partitioner、有些不保持partitioner、有些会shuffle、有些不会shuffle。我们可以根据这两个维度对常见的transformation进行划分。</p>
+<ul>
+<li>有根据key移动的需求，可能会shuffle（除非已经根据paritioner分区过了）；不会改变key并且保持原有的分区<ul>
+<li>cogroup</li>
+<li>groupWith</li>
+<li>join</li>
+<li>leftOuterJoin</li>
+<li>rightOuterJoin</li>
+<li>groupByKey</li>
+<li>reduceByKey</li>
+<li>combineByKey</li>
+<li>partitionBy</li>
+<li>sortByKey</li>
+</ul>
+</li>
+<li>有根据key移动的需求，可能会shuffle（除非已经根据paritioner分区过了）；会改变key并且不保持原有的分区<ul>
+<li>distinct</li>
+<li>intersection</li>
+<li>repartition</li>
+<li>coalesce</li>
+<li>sortBy</li>
+</ul>
+</li>
+<li>没有根据key移动的需求，不会shuffle；不会改变key并且保持原有的分区<ul>
+<li>foldByKey</li>
+<li>mapValues</li>
+<li>flatMapValues</li>
+<li>filter</li>
+</ul>
+</li>
+<li>没有根据key移动的需求，不会shuffle；会改变key，不保持原有的分区<ul>
+<li>map </li>
+<li>flatmap</li>
+</ul>
+</li>
+</ul>
+<p>对于进行shuffle后的rdd，再需要被使用时需要进行cache就不多描述了。这里我们需要考虑的另一个问题是，shuffle后的rdd进行丢失分区的transformation会怎样？即从第1种转换到第2、4种，从第2中转换到第2、4种。<br>从1转到2，以及从2转到2可能不会有什么问题，以为这个转换依然会进行shuffle，视情况进行cache就行。但是对于从1到4，以及从2到4，我们的分区信息就丢失了</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">x -&gt; y</th>
+<th style="text-align:center">shuffle, keep key</th>
+<th style="text-align:center">shuffle, change key</th>
+<th style="text-align:center">no shuffle, keep key</th>
+<th style="text-align:center">no shuffle, change key</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">shuffle, keep key</td>
+<td style="text-align:center">/</td>
+<td style="text-align:center">/</td>
+<td style="text-align:center">√</td>
+<td style="text-align:center">X</td>
+</tr>
+<tr>
+<td style="text-align:center">shuffle, change key</td>
+<td style="text-align:center">/</td>
+<td style="text-align:center">/</td>
+<td style="text-align:center">√</td>
+<td style="text-align:center">X</td>
+</tr>
+<tr>
+<td style="text-align:center">no shuffle, keep key</td>
+<td style="text-align:center">/</td>
+<td style="text-align:center">/</td>
+<td style="text-align:center">O</td>
+<td style="text-align:center">O</td>
+</tr>
+<tr>
+<td style="text-align:center">no shuffle, changekey</td>
+<td style="text-align:center">/</td>
+<td style="text-align:center">/</td>
+<td style="text-align:center">O</td>
+<td style="text-align:center">O</td>
+</tr>
+</tbody>
+</table>
+<p>“/“ 表示只要视情况对y进行cache；”O”表示正常的转化，一般不需要cache；”√”表示正常的转化，视情况对x进行cache；”X”表示将丢失分区信息，如果y后面的transformation z需要进行shuffle，那么将不得不重新shuffle，如果z不需要shuffle则不会有大问题。</p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://github.com/rohgar/scala-spark-4/wiki/Wide-vs-Narrow-Dependencies" target="_blank" rel="noopener">https://github.com/rohgar/scala-spark-4/wiki/Wide-vs-Narrow-Dependencies</a></p>
+<blockquote>
+<p>本文为学习过程中产生的总结，由于学艺不精可能有些观点或者描述有误，还望各位同学帮忙指正，共同进步。</p>
+</blockquote>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        
+          
+        
+        <div class="post-tags">
+          
+            <a href="/tags/spark/" rel="tag"># spark</a>
+          
+            <a href="/tags/scala/" rel="tag"># scala</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/12/23/使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题.html" rel="next" title="使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题">
+                <i class="fa fa-chevron-left"></i> 使用dbutils作为pymysql的连接池时，setsession偶尔失效的问题
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Long</p>
+              <div class="site-description motion-element" itemprop="description"></div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">16</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#join-transformation"><span class="nav-number">1.</span> <span class="nav-text">join transformation</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#rdd1和rdd2的partitioner不同"><span class="nav-number">1.1.</span> <span class="nav-text">rdd1和rdd2的partitioner不同</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#rdd1和rdd2的partitioner相同"><span class="nav-number">1.2.</span> <span class="nav-text">rdd1和rdd2的partitioner相同</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#小结"><span class="nav-number">1.3.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#分析源码实现"><span class="nav-number">2.</span> <span class="nav-text">分析源码实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#如何知道是否会发生shuffle"><span class="nav-number">3.</span> <span class="nav-text">如何知道是否会发生shuffle</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#使用分区可以避免shuffle的常见场景"><span class="nav-number">4.</span> <span class="nav-text">使用分区可以避免shuffle的常见场景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#对常见的transformation进行分类"><span class="nav-number">5.</span> <span class="nav-text">对常见的transformation进行分类</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考"><span class="nav-number">6.</span> <span class="nav-text">参考</span></a></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Long</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+    
+    
+      
+    
+  
+  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=3.4.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.2.0"></script>
+
+  <script src="/js/motion.js?v=7.2.0"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.2.0"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.2.0"></script>
+<script src="/js/post-details.js?v=7.2.0"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.2.0"></script>
+
+
+  
+
+  
+
+  
+
+  
+
+
+  
+
+
+  
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

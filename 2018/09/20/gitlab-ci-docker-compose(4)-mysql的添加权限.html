@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+<link rel="stylesheet" href="/css/main.css?v=7.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: false,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="目前网上添加msyql用户和权限时，很多都是使用INSERT, UPDATE, DELETE 直接操作权限表，并且总结得参差不齐。根据官方网站应该使用 CREATE USER 语句创建用户，使用 GRANT 语句添加权限。  在mysql:5.7.22中需要配合 /docker-entrypoint-initdb.d/ 目录初始化数据，这时可以在该目录的sql中可以添加权限的配置。  123456">
+<meta name="keywords" content="docker,gitlabci">
+<meta property="og:type" content="article">
+<meta property="og:title" content="gitlab ci &amp;&amp; docker-compose(4)-mysql的添加权限">
+<meta property="og:url" content="http://blog.zhang7long.com/2018/09/20/gitlab-ci-docker-compose(4)-mysql的添加权限.html">
+<meta property="og:site_name" content="keep running">
+<meta property="og:description" content="目前网上添加msyql用户和权限时，很多都是使用INSERT, UPDATE, DELETE 直接操作权限表，并且总结得参差不齐。根据官方网站应该使用 CREATE USER 语句创建用户，使用 GRANT 语句添加权限。  在mysql:5.7.22中需要配合 /docker-entrypoint-initdb.d/ 目录初始化数据，这时可以在该目录的sql中可以添加权限的配置。  123456">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2020-05-17T06:32:49.289Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="gitlab ci &amp;&amp; docker-compose(4)-mysql的添加权限">
+<meta name="twitter:description" content="目前网上添加msyql用户和权限时，很多都是使用INSERT, UPDATE, DELETE 直接操作权限表，并且总结得参差不齐。根据官方网站应该使用 CREATE USER 语句创建用户，使用 GRANT 语句添加权限。  在mysql:5.7.22中需要配合 /docker-entrypoint-initdb.d/ 目录初始化数据，这时可以在该目录的sql中可以添加权限的配置。  123456">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="http://blog.zhang7long.com/2018/09/20/gitlab-ci-docker-compose(4)-mysql的添加权限">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>gitlab ci && docker-compose(4)-mysql的添加权限 | keep running</title>
+  
+
+
+
+
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">keep running</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2018/09/20/gitlab-ci-docker-compose(4)-mysql的添加权限.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">gitlab ci && docker-compose(4)-mysql的添加权限
+
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-09-20 01:37:27" itemprop="dateCreated datePublished" datetime="2018-09-20T01:37:27+08:00">2018-09-20</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>目前网上添加msyql用户和权限时，很多都是使用INSERT, UPDATE, DELETE 直接操作权限表，并且总结得参差不齐。根据官方网站应该使用 CREATE USER 语句创建用户，使用 GRANT 语句添加权限。</p>
+<ul>
+<li>在mysql:5.7.22中需要配合 /docker-entrypoint-initdb.d/ 目录初始化数据，这时可以在该目录的sql中可以添加权限的配置。</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"> <span class="comment">-- 不应该在这里直接删除'root'@'%'，否则会影响原本root应有的权限。可以通过该命令查看该命令的影响，SHOW GRANTS FOR 'root'@'%';</span></span><br><span class="line"> <span class="comment">-- 如果不删用户root，会出现该权限 GRANT ALL PRIVILEGES ON *.* to 'root'@'%' WITH GRANT OPTION</span></span><br><span class="line"> <span class="comment">-- 如果删了用户root，会出现该权限 GRANT USAGE ON *.* to 'root'@'%'</span></span><br><span class="line"> <span class="comment">-- drop user 'root'@'%';</span></span><br><span class="line"></span><br><span class="line"> <span class="comment">-- 密码在启动mysql容器或者在docker-compose.yml文件中时就应该指定，如</span></span><br><span class="line"> <span class="comment">-- docker run -e MYSQL_ROOT_PASSWORD=test mysql:5.7.22</span></span><br><span class="line"> <span class="comment">-- 或</span></span><br><span class="line"> <span class="comment">-- environment:</span></span><br><span class="line"> <span class="comment">--     - MYSQL_ROOT_PASSWORD=test</span></span><br><span class="line"> <span class="comment">-- CREATE USER 'root'@'%' IDENTIFIED BY 'test';</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">GRANT</span> ALL <span class="keyword">PRIVILEGES</span> <span class="keyword">ON</span> YOU_DATABASE.* <span class="keyword">TO</span> <span class="string">'root'</span>@<span class="string">'%'</span>;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>当然建库建表前应该用if判断，不判断也行，因为本来就是新实例。</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">DROP</span> <span class="keyword">DATABASE</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> YOUR_DATABASE;</span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">DATABASE</span> YOUR_DATABASE;</span><br><span class="line"></span><br><span class="line"><span class="keyword">USE</span> YOUR_DATABASE;</span><br><span class="line"></span><br><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> <span class="string">`your_table`</span> (</span><br><span class="line"></span><br><span class="line">) <span class="keyword">ENGINE</span>=<span class="keyword">InnoDB</span> <span class="keyword">DEFAULT</span> <span class="keyword">CHARSET</span>=utf8 <span class="keyword">COMMENT</span>=<span class="string">'必要的注释'</span>;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>查看权限</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SHOW</span> <span class="keyword">GRANTS</span> <span class="keyword">FOR</span> <span class="string">'root'</span>@<span class="string">'%'</span>;</span><br></pre></td></tr></table></figure>
+<h3 id="docker-compose-up命令"><a href="#docker-compose-up命令" class="headerlink" title="docker-compose up命令"></a>docker-compose up命令</h3><p>运行docker-compose up时，如果以前未创建相应的镜像，则默认会创建镜像并且根据该镜像启动container；如果以前创建过镜像，则判断当前是否有对应的container，如果有则直接启动，如果没有则创建对应的container；</p>
+<ul>
+<li><p>–build  Build images before starting containers.</p>
+<ul>
+<li>–build，加了这个选项后，每次运行 docker-compose up 都会构建镜像。构建镜像有另外一个专门的命令docker-compose build，可以使用–build-arg key=val 传入编译时参数，如下则为 –build-arg X=3 –build-arg Y=4。传入到docker-compose后，再传到dockerfile的 ARG 声明的同名变量中，</li>
+</ul>
+</li>
+</ul>
+<figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># docker-compose.yml</span></span><br><span class="line"><span class="attr">version:</span> <span class="string">'3'</span></span><br><span class="line"></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line"><span class="attr">    app:</span></span><br><span class="line"><span class="attr">        build:</span></span><br><span class="line"><span class="attr">            context:</span> <span class="string">.</span></span><br><span class="line"><span class="attr">            dockerfile:</span> <span class="string">docker/dockerfile</span></span><br><span class="line"><span class="attr">            args:</span></span><br><span class="line"><span class="attr">                X:</span> <span class="string">$&#123;X:-1&#125;</span> <span class="comment">#如果X不传，则X为1</span></span><br><span class="line"><span class="attr">                Y:</span> <span class="string">$&#123;Y:-2&#125;</span> <span class="comment">#如果Y不传，则Y为2</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># dockerfile</span></span><br><span class="line"><span class="string">FROM</span> <span class="string">some-image</span></span><br><span class="line"><span class="comment"># 包含编译时默认值</span></span><br><span class="line"><span class="string">ARG</span> <span class="string">X=1</span></span><br><span class="line"><span class="string">ARG</span> <span class="string">Y=gitlabci</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 编译时不包含默认值</span></span><br><span class="line"><span class="comment">#ARG X</span></span><br><span class="line"><span class="comment">#ARG Y</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 设置容器内部环境变量</span></span><br><span class="line"><span class="string">ENV</span> <span class="string">X=$X</span></span><br><span class="line"><span class="string">ENV</span> <span class="string">Y=$Y</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>–force-recreate  Recreate containers even if their configuration and image haven’t changed.<ul>
+<li>–force-recreate，加了这个选项后，docker-compose会重新创建container，即使与它对应的镜像没有变化</li>
+</ul>
+</li>
+<li>-V, –renew-anon-volumes   Recreate anonymous volumes instead of retrievingdata from the previous containers.<ul>
+<li>1.22.0版本有这个选项，某些低版本的不存在该选项</li>
+<li>仅在启动的容器已经被创建的情况下有意义</li>
+<li>从字面上来看，使用该选项运行docker-compose up 启动容器时，将会不使用复用上一个container的volume，而是重新创建对应的volume。如果不使用该选项，而是只加了–force-recreate也将仅仅会重新创建对应的容器，而不会重新mount根据对应目录而创建的volume。这个可以通过docker inpsect containter_name命令验证，两次运行docker-compose –build –force-recreate所创建的容器对应的volume的name依然相同。</li>
+<li>这个选项的存在的意义是，如果加了改选项，第一次启动容器的时候，mount对应的目录的文件有误，想stop掉当前的container，并且在对应的目录添加了对应的文件后，第二次启动容器时能够重新mount对应的文件夹，使容器读取正确对应的文件；如果不加改选项，则使用上一个container的volume，不能读取正确的文件</li>
+<li>当然，也可以不使用该命令，只要不是重启container的场景即可，什么意思呢，可以先 docker-compose rm -v contaner_name，下次docker-compose up的时候就是创建新容器了，当然也会重新挂载对应的volume。目前低版本的docker-comopose就是这么做的。</li>
+<li>之前在mysql:5.7.22 版本的docker容器在使用/docker-entrypoint-initdb.d/ 目录初始化数据时，遇到类似的问题，踩了很多坑。</li>
+</ul>
+</li>
+<li>总结，docker-compose up 与 docker start 命令更相似，因为它们都会复用之前的container（如果存在），而docker run是总会创建新的container。这要点需要牢记，才能避免踩坑。</li>
+</ul>
+<p>参考:</p>
+<p>Mysql官网 <a href="https://dev.mysql.com/doc/refman/5.7/en/adding-users.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/5.7/en/adding-users.html</a></p>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        
+          
+        
+        <div class="post-tags">
+          
+            <a href="/tags/docker/" rel="tag"># docker</a>
+          
+            <a href="/tags/gitlabci/" rel="tag"># gitlabci</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/09/18/gitlab-ci-docker-compose(3)-mysql的初始化.html" rel="next" title="gitlab ci && docker-compose(3)-mysql的初始化">
+                <i class="fa fa-chevron-left"></i> gitlab ci && docker-compose(3)-mysql的初始化
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/09/25/gitlab-ci-docker-compose(5)-容器启动环境变量传递.html" rel="prev" title="gitlab ci && docker-compose(5)-容器启动环境变量传递">
+                gitlab ci && docker-compose(5)-容器启动环境变量传递 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Long</p>
+              <div class="site-description motion-element" itemprop="description"></div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">16</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#docker-compose-up命令"><span class="nav-number">1.</span> <span class="nav-text">docker-compose up命令</span></a></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Long</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+    
+    
+      
+    
+  
+  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=3.4.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.2.0"></script>
+
+  <script src="/js/motion.js?v=7.2.0"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.2.0"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.2.0"></script>
+<script src="/js/post-details.js?v=7.2.0"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.2.0"></script>
+
+
+  
+
+  
+
+  
+
+  
+
+
+  
+
+
+  
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

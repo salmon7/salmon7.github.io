@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+<link rel="stylesheet" href="/css/main.css?v=7.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: false,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="如无特别说明，本文源码版本为 spark 2.3.4  学习spark有一段时间了，最近想动动手写个demo出来，大致的功能是从kafka读取用户点击记录，用spark streaming对这些数据进行读取并统计用户一段时间的点击记录，期望最后能落盘到redis中供需求方调用。 这个demo看似简单，但是作为一个新手，我也遇到了一些看起来比较奇怪的问题。再此总结一下我遇到的一些问题，希望能给遇到">
+<meta name="keywords" content="spark,scala">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark学习系列之一：新手常见问题">
+<meta property="og:url" content="http://blog.zhang7long.com/2019/12/16/Spark学习系列之一：新手常见问题.html">
+<meta property="og:site_name" content="keep running">
+<meta property="og:description" content="如无特别说明，本文源码版本为 spark 2.3.4  学习spark有一段时间了，最近想动动手写个demo出来，大致的功能是从kafka读取用户点击记录，用spark streaming对这些数据进行读取并统计用户一段时间的点击记录，期望最后能落盘到redis中供需求方调用。 这个demo看似简单，但是作为一个新手，我也遇到了一些看起来比较奇怪的问题。再此总结一下我遇到的一些问题，希望能给遇到">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2020-05-17T06:32:49.287Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Spark学习系列之一：新手常见问题">
+<meta name="twitter:description" content="如无特别说明，本文源码版本为 spark 2.3.4  学习spark有一段时间了，最近想动动手写个demo出来，大致的功能是从kafka读取用户点击记录，用spark streaming对这些数据进行读取并统计用户一段时间的点击记录，期望最后能落盘到redis中供需求方调用。 这个demo看似简单，但是作为一个新手，我也遇到了一些看起来比较奇怪的问题。再此总结一下我遇到的一些问题，希望能给遇到">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="http://blog.zhang7long.com/2019/12/16/Spark学习系列之一：新手常见问题">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>Spark学习系列之一：新手常见问题 | keep running</title>
+  
+
+
+
+
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">keep running</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2019/12/16/Spark学习系列之一：新手常见问题.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Spark学习系列之一：新手常见问题
+
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2019-12-16 02:00:19" itemprop="dateCreated datePublished" datetime="2019-12-16T02:00:19+08:00">2019-12-16</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <blockquote>
+<p>如无特别说明，本文源码版本为 spark 2.3.4</p>
+</blockquote>
+<p>学习spark有一段时间了，最近想动动手写个<a href="https://github.com/salmon7/spark-and-scala-learning" target="_blank" rel="noopener">demo</a>出来，大致的功能是从kafka读取用户点击记录，用spark streaming对这些数据进行读取并统计用户一段时间的点击记录，期望最后能落盘到redis中供需求方调用。</p>
+<p>这个demo看似简单，但是作为一个新手，我也遇到了一些看起来比较奇怪的问题。再此总结一下我遇到的一些问题，希望能给遇到同样问题的人带来一些帮助。</p>
+<h2 id="问题一：spark的并行度是多少？"><a href="#问题一：spark的并行度是多少？" class="headerlink" title="问题一：spark的并行度是多少？"></a>问题一：spark的并行度是多少？</h2><p>我相信一开始接触的初学者对此肯定有疑惑，并行度指的什么？我认为在spark中，这个并行度指的是partition的数量，无论是通过parallelize初始化rdd，还是通过join和reduceByKey等shuffle操作，都意味着需要确定这个新rdd的paritition数量。这里涉及到一个参数<code>spark.default.parallelism</code>，该参数<strong>大多数情况下</strong>是parallelize、join、reducdeByKey等操作的<strong>默认</strong>并行度。如果不定义这个参数，默认情况下分区数量在不同情景的情况下有所不同：</p>
+<ul>
+<li>对于join和reduceByKey等shuffle操作，分区数一般为多个父rdd中partition数目最大的一个。</li>
+<li>对于parallelize进行初始化操作，分区数在不同部署模式下不同：<ul>
+<li>local[*]：本地cpu的core数量，local[N]则为N，local则为1</li>
+<li>meos：默认为8</li>
+<li>other：一般为executor个数 * 每个executor的core个数</li>
+</ul>
+</li>
+<li>当然如果定义了<code>spark.default.parallelism</code>参数，其默认分区数也不一定是其值，具体分析见<a href="/2019/12/22/Spark学习系列之二：rdd分区数量分析.html">Spark学习系列之二：rdd分区数量分析</a>。实际api中也能通过传递numPartitions参数覆盖<code>spark.default.parallelism</code>，自行决定并行度。</li>
+<li>比如正在使用的mac是四核，假设向yarn申请executor个数为2，每个executor的core数量为1，那么spark.default.parallelism的值为2，这时一般情况下是不能充分利用其申请核数资源的，最好是申请核数的2~3倍。可以通过 –conf 传入参数 <code>--conf spark.default.parallelism = 4</code> 或者 <code>--conf spark.default.parallelism = 6</code>，使其默认值为申请核数的2~3倍。如果有的task执行比较快，core就空闲出来了，为了多利用core就设置task数量为2~3倍。当然最后的并行度还需要根据实际情况进行分析。</li>
+</ul>
+<blockquote>
+<p>如何确定本机核数？通过local[*]模式进行parallelize初始化rdd，再输出myrdd.partitions.size即可得，也可以通过java代码Runtime.getRuntime.availableProcessors()获得</p>
+</blockquote>
+<p>参考：<br><a href="https://spark.apache.org/docs/latest/configuration.html" target="_blank" rel="noopener">https://spark.apache.org/docs/latest/configuration.html</a><br><a href="http://spark.apache.org/docs/latest/tuning.html" target="_blank" rel="noopener">http://spark.apache.org/docs/latest/tuning.html</a></p>
+<h2 id="问题二：standalone模式下，executor个数和executor核数如何确定？"><a href="#问题二：standalone模式下，executor个数和executor核数如何确定？" class="headerlink" title="问题二：standalone模式下，executor个数和executor核数如何确定？"></a>问题二：standalone模式下，executor个数和executor核数如何确定？</h2><p>由于需要通过spark streaming读取kafka，如果对应topic的partition数量已知，那么应该启动对应个数的executor，因为kafka的一个parition同一时间只允许同一个groupid的consumer读取，如果topic的partition为1，申请的executor为2，那么将只有一个executor的资源得到了利用。</p>
+<p>既然executor个数比较重要，yarn模式可以通过<code>--num-executors</code>确定executor个数，那standalone模式如何确定的呢？直接先说结论：</p>
+<ul>
+<li>executor的数量 = total-executor-cores/executor-cores</li>
+<li><code>--total-executor-cores</code> 对应配置 <code>spark.cores.max</code> (default: <code>spark.deploy.defaultCores</code>)，表示一个application最大能用的core数目；如果没有设置则默认上限为<code>spark.deploy.defaultCores</code>，该配置的值默认为infinite（不限）</li>
+<li><code>--executor-cores</code> 对应配置 <code>spark.executor.cores</code>，表示每个executor的core数目</li>
+<li>可以看到standalone的executor数量并不能直接指定，而是通过core的换算得到的，如果对executor数目有要求的话，可以额外关注一下。</li>
+</ul>
+<blockquote>
+<p>以下是我写demo过程遇到问题，以及解决问题的大致流程。</p>
+</blockquote>
+<p>在写demo过程中通过spark-sumbit提交任务时，忘了写master，但是通过<code>--executor-cores</code>指定了每个executor的core数量。等应用跑起来后，发现spark ui上，发现worker上有1个executor，每个executor4个core，这显然不符合的预期。明明通过<code>--executor-cores</code>指定了executor的core数量，为什么申请到的core数目不符合预期？即使spark-submit的script中没包含master，但是程序是指定了master（spark://zhangqilongdeMacBook-Air.local:7077）。我决定进行多次调整参数，验证每种情况下申请到executor数量和每个executor的core数量，总结如下：</p>
+<ul>
+<li>master和executor-cores，只配置一个或者两个都不配，则只申请一个executor，并且executor将尽量使用worker的所有core。</li>
+<li>master和executor-cores两个都配，则申请的executor数量 = workder core的总数/executor-cores，每个executor的core数量和executor-cores一致。</li>
+</ul>
+<p>通过源码可以发现：</p>
+<ul>
+<li><code>--executor-cores</code>只有在–master为standalone、yarn、kubernetes模式下才会生效，如果不是这些模式，将会通过<strong>默认配置文件</strong>指定缺失的值。即如果不指定master的情况下（默认为local[*]），<code>--executor-cores</code>并不会生效，并且使用 <code>SPAKR_HOME/conf/spark-defaults.conf</code>配置文件中的值对其赋值，如果该配置文件中依然不存在，则为spark系统默认对该变量的值，即infinite（不限）。</li>
+<li><code>--total-executor-cores</code>可以配置standalone每个application可以用的核总数（其实通过spark-submit命令行的提示也能看出来，因为yarn模式下该值不可配所以一开始这个配置被我忽略了）</li>
+</ul>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">org.apache.spark.deploy.<span class="type">Submit</span></span><br><span class="line"></span><br><span class="line">...省略部分代码</span><br><span class="line">	<span class="comment">//可以看到spark.executor.cores只在某些情况下才会被赋值</span></span><br><span class="line">	<span class="type">OptionAssigner</span>(args.executorCores, <span class="type">STANDALONE</span> | <span class="type">YARN</span> | <span class="type">KUBERNETES</span>, <span class="type">ALL_DEPLOY_MODES</span>, confKey = <span class="string">"spark.executor.cores"</span>),</span><br><span class="line">	<span class="type">OptionAssigner</span>(args.totalExecutorCores, <span class="type">STANDALONE</span> | <span class="type">MESOS</span> | <span class="type">KUBERNETES</span>, <span class="type">ALL_DEPLOY_MODES</span>, confKey = <span class="string">"spark.cores.max"</span>)</span><br><span class="line"></span><br><span class="line">...省略部分代码</span><br><span class="line">    <span class="comment">// Load any properties specified through --conf and the default properties file</span></span><br><span class="line">    <span class="comment">// 通过sparkProperties（已经读取了spark-defaluts.conf内动）hashMap对缺失配置进行填充。</span></span><br><span class="line">    <span class="keyword">for</span> ((k, v) &lt;- args.sparkProperties) &#123;</span><br><span class="line">      sparkConf.setIfMissing(k, v)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">...省略部分代码</span><br></pre></td></tr></table></figure>
+<p>参考：<br><a href="https://spark.apache.org/docs/latest/spark-standalone.html" target="_blank" rel="noopener">https://spark.apache.org/docs/latest/spark-standalone.html</a></p>
+<a id="more"></a>
+<h2 id="问题三：yarn的container个数和container核数如何确定？"><a href="#问题三：yarn的container个数和container核数如何确定？" class="headerlink" title="问题三：yarn的container个数和container核数如何确定？"></a>问题三：yarn的container个数和container核数如何确定？</h2><p>对于executor数量，相比较standalone，yarn模式下会简单很多。它会在container中运行一个executor，并且可以通过 <code>--num-executors</code> 控制executor的数量。另外由于yarn需要Application Master向集群申请资源等操作，需要额外创建一个container运行Application Master进程。所以yarn的container数量= num-executors + 1。</p>
+<p>而对于yarn container的vcores数量，发现spark-submit的<code>--executor-cores</code>参数始终没有生效，但是从spark-submit的提示语中该参数是对yarn模式生效的，为什么会没有生效？网上很多文章都没说清楚原因，直到我找到<strong>cloudera</strong>的一篇文章。大致总结一下：</p>
+<ul>
+<li>yarn默认的资源调度器（<code>DefaultResourceCalculator</code>）是只考虑memory的，cpu不在考虑范围内；</li>
+<li>只有改了capacity-scheduler.xml中的<code>yarn.scheduler.capacity.resource-calculator</code>配置为<code>DominantResourceCalculator</code>，那么yarn调度器的时候会同时考虑memory和cpu两个维度。</li>
+<li>改了默认的调度器可能带来的问题是，能够运行的container数量会较少，内存利用也会大大降低，集群吞吐量也会随之降低。</li>
+</ul>
+<p>我在本地机器上改了默认的调度器的前后对比如下：</p>
+<ul>
+<li>DefaultResourceCalculator默认调度器：</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">container面板：</span><br><span class="line">Resource:	2048 Memory, 1 VCores</span><br><span class="line"></span><br><span class="line">About the Cluster面板</span><br><span class="line">Scheduler Type | Scheduling Resource Type | Minimum Allocation | Maximum Allocation</span><br><span class="line">Capacity Scheduler | [MEMORY] | &lt;memory:1024, vCores:1&gt; | &lt;memory:8192, vCores:32&gt;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>DominantResourceCalculator调度器：</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">container面板：</span><br><span class="line">Resource:	2048 Memory, 2 VCores</span><br><span class="line"></span><br><span class="line">About the Cluster面板</span><br><span class="line">Scheduler Type | Scheduling Resource Type | Minimum Allocation | Maximum Allocation</span><br><span class="line">Capacity Scheduler | [MEMORY, CPU] | &lt;memory:1024, vCores:1&gt; | &lt;memory:8192, vCores:8&gt;</span><br></pre></td></tr></table></figure>
+<p>可以看到通过修改默认的调度器实现了vcores的正确分配。</p>
+<blockquote>
+<ul>
+<li>即使当yarn的vcore数目跟<code>--executor-cores</code>对不上时，在spark ui的Environment页面spark.executor.cores依然是和<code>--executor-cores</code>相等的，可以看到在spark层面它依然认为有executor-cores个core，内部应该会初始化对应个数的线程去处理task。  </li>
+<li>后面有时间的话，可以写一篇文章分析一下这两个资源计算器的算法。</li>
+</ul>
+</blockquote>
+<p>参考:<br><a href="https://blog.cloudera.com/managing-cpu-resources-in-your-hadoop-yarn-clusters/" target="_blank" rel="noopener">Managing CPU Resources in your Hadoop YARN Clusters</a><br><a href="http://site.clairvoyantsoft.com/understanding-resource-allocation-configurations-spark-application/" target="_blank" rel="noopener">Understanding Resource Allocation configurations for a Spark application</a><br><a href="https://stackoverflow.com/questions/38368985/spark-on-yarn-too-less-vcores-used" target="_blank" rel="noopener">Spark on YARN too less vcores used</a><br><a href="https://stackoverflow.com/questions/25563736/yarn-is-not-honouring-yarn-nodemanager-resource-cpu-vcores" target="_blank" rel="noopener">yarn is not honouring yarn.nodemanager.resource.cpu-vcores</a><br><a href="https://blog.cloudera.com/how-to-tune-your-apache-spark-jobs-part-1/" target="_blank" rel="noopener">How-to: Tune Your Apache Spark Jobs (Part 1)</a><br><a href="https://blog.cloudera.com/how-to-tune-your-apache-spark-jobs-part-2/" target="_blank" rel="noopener">How-to: Tune Your Apache Spark Jobs (Part 2)</a></p>
+<h2 id="问题四：spark-streaming的checkpoint"><a href="#问题四：spark-streaming的checkpoint" class="headerlink" title="问题四：spark streaming的checkpoint"></a>问题四：spark streaming的checkpoint</h2><p>spark streaming的checkpoint数据包含两种，第一种是元数据，包括配置、DStream的操作链、未完成的批次，这些主要是用来重启driver；第二种是rdd，一般对于无状态的rdd其实可以不用checkpoint，当然这样子可能会造成已接收但未处理的数据丢失，而对于<strong>跨批次有状态</strong>的rdd需要记忆之前的状态，同时也为了避免rdd血统过长导致存储空间过大，需要定时进行checkpoint。</p>
+<ul>
+<li>从源码上看，updateStateByKey和reduceByKeyAndWindow (有inverse函数) 的底层实现均为StateDStream</li>
+<li><p>StateDStream的 checkpoint 间隔为BatchInterval（即每个batch的间隔）的整数倍（默认为1倍），并且最小为10s</p>
+<ul>
+<li>即 StateDstream的checkpoint Interval = max(BatchInterval*n, 10), n=1,2,3,4….</li>
+<li>官网原话：For stateful transformations that require RDD checkpointing, the default interval is a multiple of the batch interval that is at least 10 seconds. 这里说明了checkpoint interval 的最小为10，并且必须为BatchInterval的整数倍，<strong>其实还可以加上默认等于BatchInterval</strong>，不然还以为一定要手动调用StateDstream的<code>checkpoint</code>方法，如The default checkpoint interval of statefull dstream is same as batch interval。</li>
+<li>从源码看的话，StateDStream覆盖了DStream的<code>mustCheckpoint</code>，并且指定为true，这也侧面说明StateDStream会默认进行checkpoint，并且不指定checkpoint directory时会报错。</li>
+</ul>
+</li>
+<li><p>除了定时checkpoint外，还需要定时清理保存的数据</p>
+<ul>
+<li>这个周期一般为checkpoint间隔的两倍，Remember Duartion = checkpoint_interval * 2</li>
+<li>如果其下游有额外进行checkpoint的话，那么该值应该等于其最近下游的remember duration * 2 和 当前checkpoint inteval * 2的最大值</li>
+<li>即Remember Duartion = max( children.checkpoint_interval, checkpoint_interval) * 2</li>
+<li><code>DStream.scala</code> 关键源码如下。可以看出，当不主动设置DStream的remember duration时，其大小为checkpoint interval的两倍。同时还会递归地为父stream设置remember duration如果子类的比父类本身remember duration大。</li>
+</ul>
+</li>
+</ul>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span>[streaming] <span class="function"><span class="keyword">def</span> <span class="title">initialize</span></span>(time: <span class="type">Time</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (zeroTime != <span class="literal">null</span> &amp;&amp; zeroTime != time) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="type">SparkException</span>(<span class="string">s"ZeroTime is already initialized to <span class="subst">$zeroTime</span>"</span></span><br><span class="line">      + <span class="string">s", cannot initialize it again to <span class="subst">$time</span>"</span>)</span><br><span class="line">  &#125;</span><br><span class="line">  zeroTime = time</span><br><span class="line">  <span class="comment">// Set the checkpoint interval to be slideDuration or 10 seconds, which ever is larger</span></span><br><span class="line">  <span class="keyword">if</span> (mustCheckpoint &amp;&amp; checkpointDuration == <span class="literal">null</span>) &#123;</span><br><span class="line">    checkpointDuration = slideDuration * math.ceil(<span class="type">Seconds</span>(<span class="number">10</span>) / slideDuration).toInt</span><br><span class="line">    logInfo(<span class="string">s"Checkpoint interval automatically set to <span class="subst">$checkpointDuration</span>"</span>)</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// Set the minimum value of the rememberDuration if not already set</span></span><br><span class="line">  <span class="keyword">var</span> minRememberDuration = slideDuration</span><br><span class="line">  <span class="keyword">if</span> (checkpointDuration != <span class="literal">null</span> &amp;&amp; minRememberDuration &lt;= checkpointDuration) &#123;</span><br><span class="line">    <span class="comment">// times 2 just to be sure that the latest checkpoint is not forgotten (#paranoia)</span></span><br><span class="line">    minRememberDuration = checkpointDuration * <span class="number">2</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> (rememberDuration == <span class="literal">null</span> || rememberDuration &lt; minRememberDuration) &#123;</span><br><span class="line">    rememberDuration = minRememberDuration</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// Initialize the dependencies</span></span><br><span class="line">  dependencies.foreach(_.initialize(zeroTime))</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>[streaming] <span class="function"><span class="keyword">def</span> <span class="title">remember</span></span>(duration: <span class="type">Duration</span>) &#123;</span><br><span class="line">  <span class="keyword">if</span> (duration != <span class="literal">null</span> &amp;&amp; (rememberDuration == <span class="literal">null</span> || duration &gt; rememberDuration)) &#123;</span><br><span class="line">    rememberDuration = duration</span><br><span class="line">    logInfo(<span class="string">s"Duration for remembering RDDs set to <span class="subst">$rememberDuration</span> for <span class="subst">$this</span>"</span>)</span><br><span class="line">  &#125;</span><br><span class="line">  dependencies.foreach(_.remember(parentRememberDuration))</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>假设BatchInterval=10s，在DAG图中有 A-&gt;B-&gt;C，A为DirectKafkaInputDStream，B为MappedDStream，C为StateDStream。</p>
+<ul>
+<li>默认情况下，只有StateDStream会进行checkpoint：<ul>
+<li>DirectKafkaInputDStream：checkpoint interval = N/A ，remember duration = 20s</li>
+<li>MappedDStream：checkpoint interval = N/A ，remember duration = 20s</li>
+<li>StateDStream：checkpoint interval = 10s ，remember duration = 20s</li>
+</ul>
+</li>
+<li><p>如果对MappedDStream进行了checkpoint，即 MappedDStream.checkpoint(Seconds(20))</p>
+<ul>
+<li>DirectKafkaInputDStream：checkpoint interval = N/A ，remember duration = 40s      <ul>
+<li>MappedDStream：checkpoint interval = 20s ，remember duration = 40s</li>
+<li>StateDStream：checkpoint interval = 10s ，remember duration = 20s</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>BatchInterval = 5s，如果对MappedDStream进行了checkpoint，即 MappedDStream.checkpoint(Seconds(5))</p>
+<ul>
+<li>DirectKafkaInputDStream：checkpoint interval = N/A ，remember duration = 20s</li>
+<li>MappedDStream：checkpoint interval = 5s ，remember duration = 20s</li>
+<li>StateDStream：checkpoint interval = 10s ，remember duration = 20s</li>
+</ul>
+</li>
+<li><p>如果对DirectKafkaInputDStream进行了checkpoint，即 DirectKafkaInputDStream.checkpoint(Seconds(30))</p>
+<ul>
+<li>DirectKafkaInputDStream：checkpoint interval = 30s，remember duration = 60s        </li>
+<li>MappedDStream：checkpoint interval = N/A ，remember duration = 20s</li>
+<li>StateDStream：checkpoint interval = 10s ，remember duration = 20s</li>
+</ul>
+</li>
+<li><p>这也为我们提供了一种调优策略，如果上游dstream设置的checkpoint间隔很短，但是占用内存很大，而下游dstream设置的checkpoint间隔很长，但是占用的内存很小。这个时候可以会以为设置上游checkpoint间隔短点，可以使其remember duration小一点，尽快清理占用的大量内存，但是很可能忽略了可能会使用下游的remember duration作为上游的remember duration，从而导致大量内存没有被释放。（当然，对于大内存也不应该频繁的进行checkpoint，这里只是举个例子说明可能出现的问题）</p>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="问题五：reduceByKeyAndWindow-消费kafka报多线程消费错误"><a href="#问题五：reduceByKeyAndWindow-消费kafka报多线程消费错误" class="headerlink" title="问题五：reduceByKeyAndWindow 消费kafka报多线程消费错误"></a>问题五：reduceByKeyAndWindow 消费kafka报多线程消费错误</h2><p>在使用spark 2.3.0版本 reduceByKeyAndWindow 时，在某些情况下会报错多线程消费kafka错误（”java.util.ConcurrentModificationException: KafkaConsumer is not safe for multi-threaded access”）。经测试在满足以下两个条件时会出现：</p>
+<ul>
+<li>spark stream context 的 batch interval &lt; windows slide Duration </li>
+<li>executor使用的core数目&gt;1 (yarn模式下，需要注意vcore的数目)</li>
+<li>kafka topic 对应的 parition 个数为1</li>
+</ul>
+<p>在网上找了挺多资料，挺多人遇到同样的问题，也看了部分reduceByKeyAndWindow的源码，最后发现是spark实现的一个bug，只要升到2.4.0版本就不会与这个问题。</p>
+<blockquote>
+<p>这个问题其实花了挺长时间去找问题的原因，也试过先cache或checkpoint，但是依然无法解决这个问题。源码实现方面，reduceByKeyAndWindow的底层流实现为ReducedWindowedDStream，里面分析了previous window、current window、new rdd、old rdd等等，对old rdd运行invReduceFunc，对new rdd运行reduceFunc。<br>最终有人重写了kafka consumer解决了此问题，详见github的pr <a href="https://github.com/apache/spark/pull/20997" target="_blank" rel="noopener">Avoid concurrent use of cached consumers in CachedKafkaConsumer</a>，核心是避免使用同时一个consumer读取TopicPartition。</p>
+</blockquote>
+<p>参考：<br><a href="https://issues.apache.org/jira/browse/SPARK-23636" target="_blank" rel="noopener">2.4.0修复bug</a><br><a href="https://blog.csdn.net/xianpanjia4616/article/details/82811414" target="_blank" rel="noopener">KafkaConsumer is not safe for multi-threaded access</a><br><a href="https://issues.apache.org/jira/browse/SPARK-19185" target="_blank" rel="noopener">https://issues.apache.org/jira/browse/SPARK-19185</a><br><a href="https://blog.csdn.net/xianpanjia4616/article/details/86703595" target="_blank" rel="noopener">spark各种报错汇总以及解决方法</a></p>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        
+          
+        
+        <div class="post-tags">
+          
+            <a href="/tags/spark/" rel="tag"># spark</a>
+          
+            <a href="/tags/scala/" rel="tag"># scala</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决.html" rel="next" title="golang数据库连接broken pipe异常原因分析及解决">
+                <i class="fa fa-chevron-left"></i> golang数据库连接broken pipe异常原因分析及解决
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/12/22/Spark学习系列之二：rdd分区数量分析.html" rel="prev" title="Spark学习系列之二：rdd分区数量分析">
+                Spark学习系列之二：rdd分区数量分析 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Long</p>
+              <div class="site-description motion-element" itemprop="description"></div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">16</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#问题一：spark的并行度是多少？"><span class="nav-number">1.</span> <span class="nav-text">问题一：spark的并行度是多少？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#问题二：standalone模式下，executor个数和executor核数如何确定？"><span class="nav-number">2.</span> <span class="nav-text">问题二：standalone模式下，executor个数和executor核数如何确定？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#问题三：yarn的container个数和container核数如何确定？"><span class="nav-number">3.</span> <span class="nav-text">问题三：yarn的container个数和container核数如何确定？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#问题四：spark-streaming的checkpoint"><span class="nav-number">4.</span> <span class="nav-text">问题四：spark streaming的checkpoint</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#问题五：reduceByKeyAndWindow-消费kafka报多线程消费错误"><span class="nav-number">5.</span> <span class="nav-text">问题五：reduceByKeyAndWindow 消费kafka报多线程消费错误</span></a></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Long</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+    
+    
+      
+    
+  
+  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=3.4.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.2.0"></script>
+
+  <script src="/js/motion.js?v=7.2.0"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.2.0"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.2.0"></script>
+<script src="/js/post-details.js?v=7.2.0"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.2.0"></script>
+
+
+  
+
+  
+
+  
+
+  
+
+
+  
+
+
+  
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

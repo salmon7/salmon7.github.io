@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+<link rel="stylesheet" href="/css/main.css?v=7.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: false,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="部门某些业务需要在海外上线，涉及到数据库时区、应用时区的转换。本文将讨论golang针对数据库时区的处理问题。  为了方便讨论，避免混淆，本文对“时间”的表达方式作出约定：时间=时区时间+时区。如时间 2019-05-21 15:48:38 CST ,则其时区时间为2019-05-21 15:48:38，时区为CST。如果没有特别说明，本文提到的“时间”都包含时区。  一、golang中mysql">
+<meta name="keywords" content="go,mysql">
+<meta property="og:type" content="article">
+<meta property="og:title" content="浅谈golang对mysql时间类型数据转换的问题">
+<meta property="og:url" content="http://blog.zhang7long.com/2019/11/09/浅谈golang对mysql时间类型数据转换的问题.html">
+<meta property="og:site_name" content="keep running">
+<meta property="og:description" content="部门某些业务需要在海外上线，涉及到数据库时区、应用时区的转换。本文将讨论golang针对数据库时区的处理问题。  为了方便讨论，避免混淆，本文对“时间”的表达方式作出约定：时间=时区时间+时区。如时间 2019-05-21 15:48:38 CST ,则其时区时间为2019-05-21 15:48:38，时区为CST。如果没有特别说明，本文提到的“时间”都包含时区。  一、golang中mysql">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://blog.zhang7long.com/2019/11/09/浅谈golang对mysql时间类型数据转换的问题/golang存time.Time源码.png">
+<meta property="og:image" content="http://blog.zhang7long.com/2019/11/09/浅谈golang对mysql时间类型数据转换的问题/golang取time.Time源码.png">
+<meta property="og:updated_time" content="2020-05-17T06:32:49.291Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="浅谈golang对mysql时间类型数据转换的问题">
+<meta name="twitter:description" content="部门某些业务需要在海外上线，涉及到数据库时区、应用时区的转换。本文将讨论golang针对数据库时区的处理问题。  为了方便讨论，避免混淆，本文对“时间”的表达方式作出约定：时间=时区时间+时区。如时间 2019-05-21 15:48:38 CST ,则其时区时间为2019-05-21 15:48:38，时区为CST。如果没有特别说明，本文提到的“时间”都包含时区。  一、golang中mysql">
+<meta name="twitter:image" content="http://blog.zhang7long.com/2019/11/09/浅谈golang对mysql时间类型数据转换的问题/golang存time.Time源码.png">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="http://blog.zhang7long.com/2019/11/09/浅谈golang对mysql时间类型数据转换的问题">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>浅谈golang对mysql时间类型数据转换的问题 | keep running</title>
+  
+
+
+
+
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">keep running</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2019/11/09/浅谈golang对mysql时间类型数据转换的问题.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">浅谈golang对mysql时间类型数据转换的问题
+
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2019-11-09 22:19:22" itemprop="dateCreated datePublished" datetime="2019-11-09T22:19:22+08:00">2019-11-09</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>部门某些业务需要在海外上线，涉及到数据库时区、应用时区的转换。本文将讨论golang针对数据库时区的处理问题。</p>
+<blockquote>
+<p>为了方便讨论，避免混淆，本文对“时间”的表达方式作出约定：时间=时区时间+时区。如时间 2019-05-21 15:48:38 CST ,则其时区时间为2019-05-21 15:48:38，时区为CST。如果没有特别说明，本文提到的“时间”都包含时区。</p>
+</blockquote>
+<h2 id="一、golang中mysql数据库驱动的时区配置"><a href="#一、golang中mysql数据库驱动的时区配置" class="headerlink" title="一、golang中mysql数据库驱动的时区配置"></a>一、golang中mysql数据库驱动的时区配置</h2><p>mysql中关于时间日期的概念数据模型有<code>DATE</code>、<code>DATETIME</code>、<code>TIMESTAMP</code>，golang程序根据数据链接DSN（Data Source Name）配置，数据库驱动 github.com/go-sql-driver/mysql 可以对这三种类型的值转换成go中的time.Time类型，关键配置如下：</p>
+<ul>
+<li>parseTime<ul>
+<li>默认为false，把mysql中的 <code>DATE</code>、<code>DATETIME</code>、<code>TIMESTAMP</code> 转为golang中的[]byte类型</li>
+<li>设置为true，将会转为golang中的 <code>time.Time</code> 类型</li>
+</ul>
+</li>
+<li>loc<ul>
+<li>默认为UTC，表示转换<code>DATE</code>、<code>DATETIME</code>、<code>TIMESTAMP</code> 为 <code>time.Time</code> 时所使用的时区</li>
+<li>设置成Local，则与系统设置的时区一致</li>
+<li>如果想要设置成中国时区可以设置成 <code>Asia/Shanghai</code> ，更多的时区可以参考 <code>/usr/share/zoneinfo/</code> 或者<code>$GOROOT/lib/time/zoneinfo.zip</code>。</li>
+</ul>
+</li>
+</ul>
+<p>在实际的使用中，我们往往会配置成 <code>parseTime=true</code> 和 <code>loc=Local</code>，这样避免了手动转换<code>DATE</code>、<code>DATETIME</code>、<code>TIMESTAMP</code>。</p>
+<h2 id="二、golang如何转换mysql的时间类型"><a href="#二、golang如何转换mysql的时间类型" class="headerlink" title="二、golang如何转换mysql的时间类型"></a>二、golang如何转换mysql的时间类型</h2><blockquote>
+<p>在涉及到不同时区时，我们golang程序应该怎么处理mysql的 DATE、DATETIME、TIMESTAMP 数据类型？是否只要配置了parseTime=true&amp;loc=xxx就不会有问题？我们来做两个小实验。</p>
+</blockquote>
+<h3 id="实验一：应用和数据库在同一时区"><a href="#实验一：应用和数据库在同一时区" class="headerlink" title="实验一：应用和数据库在同一时区"></a>实验一：应用和数据库在同一时区</h3><h4 id="1-timestamp"><a href="#1-timestamp" class="headerlink" title="1.timestamp"></a>1.timestamp</h4><p>a.系统时区设置为CST，mysql和golang在同一个时区的机器上。（如何设置和查看时区可以参考本文第五节内容。）</p>
+<ul>
+<li>golang在程序中连接数据库使用的配置DSN是parseTime=true&amp;loc=xxx，xxx分别为UTC、Asia/Shanghai、Europe/London、Local。</li>
+<li>mysql终端中insert一条timestamp【时区时间】为2019-04-02 13:18:17的记录，其UNIX_TIMESTAMP(timestamp)=1554182297。</li>
+</ul>
+<p>以下1~5行均为golang程序读取刚插入数据库的数据结果，第一列输出分别为链接数据库DSN配置，第二列为转换为time.Time后的输出。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">parseTime=true&amp;loc=UTC:                  2019-04-02 13:18:17 +0000 UTC</span><br><span class="line">parseTime=true&amp;loc=Asia/Shanghai:        2019-04-02 13:18:17 +0800 CST</span><br><span class="line">parseTime=true&amp;loc=Europe/London:        2019-04-02 13:18:17 +0100 BST</span><br><span class="line">parseTime=true&amp;loc=Local:                2019-04-02 13:18:17 +0800 CST</span><br></pre></td></tr></table></figure>
+<p>b.同样的机器，修改系统时区为BST，在mysql终端中select上一步插入的数据，timestamp【时区时间】为2019-04-02 06:18:17，UNIX_TIMESTAMP(timestamp)=1554182297。程序输出为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">parseTime=true&amp;loc=UTC:                  2019-04-02 06:18:17 +0000 UTC</span><br><span class="line">parseTime=true&amp;loc=Asia/Shanghai:        2019-04-02 06:18:17 +0800 CST</span><br><span class="line">parseTime=true&amp;loc=Europe/London:        2019-04-02 06:18:17 +0100 BST</span><br><span class="line">parseTime=true&amp;loc=Local:                2019-04-02 06:18:17 +0100 BST</span><br></pre></td></tr></table></figure>
+<p>c.小结：</p>
+<ul>
+<li>UNIX_TIMESTAMP可以把mysql的timstamp转为距离 1970-01-01 00:00:00 UTC 的秒数，这个经过转换后的值无论mysql在任何时区都不会变。</li>
+<li>即使同一条数据库记录，由于时区不同，mysql终端中直接select出的timestamp的【时区时间】也不同。也侧面说明了mysql内部实现的timstamp结构体中包含了时区信息，在输出时根据当前时区做转换，输出当前【时区时间】。</li>
+<li>golang程序获取到的time.Time等于：mysql【时区时间】+ 时区，时区为loc指定的时区，与mysql时区没有关系。</li>
+</ul>
+<a id="more"></a>
+<h4 id="2-date"><a href="#2-date" class="headerlink" title="2.date"></a>2.date</h4><p>a.系统时区设置为CST，mysql和golang在同一个时区的机器上。</p>
+<ul>
+<li>golang在程序中连接数据库使用的配置DSN是parseTime=true&amp;loc=xxx，xxx分别为UTC、Asia/Shanghai、Europe/London、Local。</li>
+<li>mysql中insert一条【时区时间】为date=2019-04-02。</li>
+</ul>
+<p>程序输出为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">parseTime=true&amp;loc=UTC:                  2019-04-02 00:00:00 +0000 UTC</span><br><span class="line">parseTime=true&amp;loc=Asia/Shanghai:        2019-04-02 00:00:00 +0800 CST</span><br><span class="line">parseTime=true&amp;loc=Europe/London:        2019-04-02 00:00:00 +0100 BST</span><br><span class="line">parseTime=true&amp;loc=Local:                2019-04-02 00:00:00 +0800 CST</span><br></pre></td></tr></table></figure>
+<p>b.同样的机器，修改系统时区为BST，在mysql终端中select上一步插入的数据，date【时区时间】为2019-04-02。程序输出为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">parseTime=true&amp;loc=UTC:                  2019-04-02 00:00:00 +0000 UTC</span><br><span class="line">parseTime=true&amp;loc=Asia/Shanghai:        2019-04-02 00:00:00 +0800 CST</span><br><span class="line">parseTime=true&amp;loc=Europe/London:        2019-04-02 00:00:00 +0100 BST</span><br><span class="line">parseTime=true&amp;loc=Local:                2019-04-02 00:00:00 +0100 BST</span><br></pre></td></tr></table></figure>
+<p>c.小结</p>
+<ul>
+<li>同一条数据库记录，不管时区golang一不一样，mysql终端中select出的date始终一样。</li>
+<li>golang程序获取到的time.Time等于：mysql时区时间 + 时区，时区为loc指定的时区，与mysql时区没有关系。</li>
+</ul>
+<h4 id="3-datetime"><a href="#3-datetime" class="headerlink" title="3.datetime"></a>3.datetime</h4><p>a.系统时区设置为CST，mysql和golang在同一个时区的机器上。</p>
+<ul>
+<li>golang在程序中连接数据库使用的配置DSN是parseTime=true&amp;loc=xxx，xxx分别为UTC、Asia/Shanghai、Europe/London、Local。</li>
+<li>mysql中insert一条【时区时间】为datetime=2019-04-02 13:03:01。</li>
+</ul>
+<p>程序输出为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">parseTime=true&amp;loc=UTC:                  2019-04-02 13:03:01 +0000 UTC</span><br><span class="line">parseTime=true&amp;loc=Asia/Shanghai:        2019-04-02 13:03:01 +0800 CST</span><br><span class="line">parseTime=true&amp;loc=Europe/London:        2019-04-02 13:03:01 +0100 BST</span><br><span class="line">parseTime=true&amp;loc=Local:                2019-04-02 13:03:01 +0800 CST</span><br></pre></td></tr></table></figure>
+<p>b.同样的机器，修改系统时区为BST，在mysql终端中select上一步插入的数据，datetime【时区时间】为2019-04-02 13:03:01。程序输出为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">parseTime=true&amp;loc=UTC:                  2019-04-02 13:03:01 +0000 UTC</span><br><span class="line">parseTime=true&amp;loc=Asia/Shanghai:        2019-04-02 13:03:01 +0800 CST</span><br><span class="line">parseTime=true&amp;loc=Europe/London:        2019-04-02 13:03:01 +0100 BST</span><br><span class="line">parseTime=true&amp;loc=Local:                2019-04-02 13:03:01 +0100 BST</span><br></pre></td></tr></table></figure>
+<p>c.小结</p>
+<ul>
+<li>同一条数据库记录，不管时区一不一样，mysql终端中select出的datetime始终一样。</li>
+<li>golang程序获取到的time.Time等于：mysql时区时间 + 时区，时区为loc指定的时区，与mysql时区没有关系。</li>
+</ul>
+<h3 id="实验二：应用和数据库不在同一时区"><a href="#实验二：应用和数据库不在同一时区" class="headerlink" title="实验二：应用和数据库不在同一时区"></a>实验二：应用和数据库不在同一时区</h3><p>我们的国内应用需要访问海外数据库数据，假设国内机器操作系统设置为北京时间，golang程序在国内并且loc设置为Local，海外机器操作系统设置为UTC时间，海外数据库时区设置为跟随操作系统时间。</p>
+<p>1.如果在海外mysql终端直接insert date、datetime、timestamp，在国内golang程序获取到的time.Time为 mysql【时区时间】+ CST时区，与实验一一致。</p>
+<p>2.如果在国内golang程序中insert date、datetime、timestamp，在海外mysql客户端读取的结果为 国内【时区时间】。</p>
+<p>3.如果在国内golang程序中insert timestamp 是通过列字段 自动更新或者通过 CURRENT_TIMESTAMP() 插入，在海外mysql客户端读取的结果为 mysql【时区时间】。</p>
+<p>4.小结</p>
+<ul>
+<li>date和datetime类型不包含时区信息， <strong>mysql不会对其进行转换，存取时在mysql中相当于一个字符串</strong> 。</li>
+<li>timestamp包含时区信息，使用时需要特别注意：<ul>
+<li>在golang中如果插入/更新timestamp时，显式指定其时区时间，插入数据库，再取出来拼接上原来时区信息，这样存的和取的time.Time是一样的，前后不变。此时，在存取timestamp过程中也相当于一个字符串。</li>
+<li>如果不显示指定timestamp的时区时间，而是通过 <code>CURRENT_TIMESTAMP</code> 自动更新或者通过 <code>CURRENT_TIMESTAMP()</code> 插入，那么mysql存进去的timestamp为 mysql的时区时间，取出来映射到time.Time为 mysql的时区时间+golang时区。这里有一个潜在的问题是，假设数据有A和B两个字段，它们分别是datetime类型和自动更新CURRENT_TIMESTAMP的timstamp类型，time.Now()对应数据库字段A，数据B字段不设置值，insert到数据库。在下次select出来的时候，两个字段会相差时区差个小时，这两个字段值本来应该指明同一个时间（忽略传输导致的误差）， <strong>因为时区的原因引起了数据不一致</strong> 。 </li>
+</ul>
+</li>
+<li>总结：<ul>
+<li>在insert的时候，当time.Time映射到date、datetime和timestamp时，都可以认为是字符串。如果 timstamp 由mysql sever端更新，可能会有数据的一致性问题。</li>
+<li>在select的时候，当date、datetime和timestamp 映射到时 time.Time 时，time.Time的地区时间为其字面量，时区为DSN配置的时区。</li>
+</ul>
+</li>
+</ul>
+<h2 id="三、源码分析"><a href="#三、源码分析" class="headerlink" title="三、源码分析"></a>三、源码分析</h2><blockquote>
+<p>实验已经做完了，大概已经知道golang对mysql时间类型数据转换的方式以及可能存在的问题。那么一起从源码的角度分析此问题，加深我们对其的理解。</p>
+</blockquote>
+<p>1.golang中time.Time存入mysql的分析：<br>跟踪golang运行sql的源码，在运行DB.Exec()时会调用interpolateParams()方法，其调用堆栈如下。  </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">database/sql/sql.go : DB.Exec()--&gt;DB.ExecContext()--&gt;DB.exec()--&gt;DB.execDC()</span><br><span class="line">database/sql/ctxutil.go : ctxDriverExec()--&gt;execer.Exec()  </span><br><span class="line">github.com/go-sql-driver/mysql/connection.go : mysqlConn.Exec() --&gt; mysqlConn.interpolateParams()</span><br></pre></td></tr></table></figure>
+<p>它对time.Time类型的变量会经过如下截图逻辑。可以看到golang对于time.Time类型，只会对其时区时间转为字符串，丢弃其时区信息，然后拼接到sql字符串中，所以golang存进数据库时区时间跟golang所在时区时间一致。 </p>
+<p><img src="/2019/11/09/浅谈golang对mysql时间类型数据转换的问题/golang存time.Time源码.png" alt="golang存time.Time源码"></p>
+<p>2.golang中取出mysql的date、datetime、timestamp映射到time.Time的分析：<br>跟踪golang运行sql的源码，发现在运行rows.Next()时会调用readRow()方法，其调用堆栈如下。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">database/sql/sql.go: Rows.Next()--&gt;Rows.nextLocked()  </span><br><span class="line">github.com/go-sql-driver/mysql/rows.go: textRows.Next()--&gt; textRows.readRow()</span><br><span class="line">github.com/go-sql-driver/mysql/packets.go: textRows.readRow()</span><br></pre></td></tr></table></figure>
+<p>对mysql的date、datetime、timestamp的变量经过如下逻辑。当程序发现其属于date、datetime、timestamp几种类型的一种时，就把其当成字符串进行解析，并且设置其时区为loc指定的时区。</p>
+<p><img src="/2019/11/09/浅谈golang对mysql时间类型数据转换的问题/golang取time.Time源码.png" alt="golang取time.Time源码"></p>
+<h2 id="四、总结"><a href="#四、总结" class="headerlink" title="四、总结"></a>四、总结</h2><p>1.可以认为timestamp在mysql中值以 UTC时区时间+UTC时区 保存。存储时对当前接受到的时间字符串进行转化，把时区时间根据当前的时区转为UTC时间再进行存储，检索时再转换回当前的时区。  </p>
+<p>2.在mysql中date、datetime均没有时区概念。  </p>
+<p>3.在go-sql-driver驱动中：</p>
+<ul>
+<li>timestamp、date、datetime在转为time.Time时，时区信息是用parseTime=true&amp;loc=xxx中loc的值指定，需要特别注意的是timestamp在mysql中的时区信息被loc替代了。  </li>
+<li>在time.Time转为timestamp、date、datetime时，将会把它们当做字符串，丢弃time.Time的时区信息。</li>
+</ul>
+<h2 id="五、参考资料"><a href="#五、参考资料" class="headerlink" title="五、参考资料"></a>五、参考资料</h2><p>1.查看mysql的时区<br>参考 <a href="https://dev.mysql.com/doc/refman/5.7/en/time-zone-support.html" target="_blank" rel="noopener">https://dev.mysql.com/doc/refman/5.7/en/time-zone-support.html</a> </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">SELECT @@GLOBAL.time_zone, @@SESSION.time_zone;  </span><br><span class="line">// or  </span><br><span class="line">show variables like &quot;system_time_zone&quot;;</span><br></pre></td></tr></table></figure>
+<p>2.linux修改时区<br>参考 <a href="http://coolnull.com/235.html" target="_blank" rel="noopener">http://coolnull.com/235.html</a>  </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">查看时区：  </span><br><span class="line">zhang@debian-salmon-gb:~/Workspace/go/src/test_time$ ll /etc/localtime  </span><br><span class="line">lrwxrwxrwx 1 root root 33 Nov 27 11:54 /etc/localtime -&gt; /usr/share/zoneinfo/Asia/Shanghai  </span><br><span class="line"></span><br><span class="line">修改时区：  </span><br><span class="line">ln -sf /usr/share/zoneinfo/Europe/London /etc/localtime  </span><br><span class="line">ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime </span><br><span class="line"> </span><br><span class="line">如何查具体的时区，如Europe/London、Asia/Shangha：  </span><br><span class="line">tzselect</span><br></pre></td></tr></table></figure>
+<p>3.MySQL中有关TIMESTAMP和DATETIME的总结<br><a href="https://www.cnblogs.com/ivictor/p/5028368.html" target="_blank" rel="noopener">https://www.cnblogs.com/ivictor/p/5028368.html</a>  </p>
+<p>4.timestamp显示为int<br>使用UNIX_TIMESTAMP(timestamp)可以把timestamp显示为数字类型的值，如1554182297，时区的改变并不会影响此值的显示；如果显示为日期时间，mysql会根据设定的时区显示时间，如CST时区显示为2019-04-02 13:18:17，东一区显示时间为2019-04-02 06:18:17  </p>
+<p>5.go-mysql-driver中时区问题<br><a href="https://github.com/go-sql-driver/mysql/issues/203" target="_blank" rel="noopener">https://github.com/go-sql-driver/mysql/issues/203</a>  </p>
+<p>6.golang中的时间和时区<br><a href="https://studygolang.com/articles/14933" target="_blank" rel="noopener">https://studygolang.com/articles/14933</a>  </p>
+<p>7.golang mysql中timestamp,datetime,int类型的区别与优劣<br><a href="https://studygolang.com/articles/6265" target="_blank" rel="noopener">https://studygolang.com/articles/6265</a>  </p>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        
+          
+        
+        <div class="post-tags">
+          
+            <a href="/tags/go/" rel="tag"># go</a>
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2018/11/14/effective-go-learning-2.html" rel="next" title="effective go learning 2">
+                <i class="fa fa-chevron-left"></i> effective go learning 2
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决.html" rel="prev" title="golang数据库连接broken pipe异常原因分析及解决">
+                golang数据库连接broken pipe异常原因分析及解决 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Long</p>
+              <div class="site-description motion-element" itemprop="description"></div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">16</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">9</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#一、golang中mysql数据库驱动的时区配置"><span class="nav-number">1.</span> <span class="nav-text">一、golang中mysql数据库驱动的时区配置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#二、golang如何转换mysql的时间类型"><span class="nav-number">2.</span> <span class="nav-text">二、golang如何转换mysql的时间类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#实验一：应用和数据库在同一时区"><span class="nav-number">2.1.</span> <span class="nav-text">实验一：应用和数据库在同一时区</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-timestamp"><span class="nav-number">2.1.1.</span> <span class="nav-text">1.timestamp</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-date"><span class="nav-number">2.1.2.</span> <span class="nav-text">2.date</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-datetime"><span class="nav-number">2.1.3.</span> <span class="nav-text">3.datetime</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#实验二：应用和数据库不在同一时区"><span class="nav-number">2.2.</span> <span class="nav-text">实验二：应用和数据库不在同一时区</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#三、源码分析"><span class="nav-number">3.</span> <span class="nav-text">三、源码分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#四、总结"><span class="nav-number">4.</span> <span class="nav-text">四、总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#五、参考资料"><span class="nav-number">5.</span> <span class="nav-text">五、参考资料</span></a></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Long</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+    
+    
+      
+    
+  
+  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=3.4.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.2.0"></script>
+
+  <script src="/js/motion.js?v=7.2.0"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.2.0"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.2.0"></script>
+<script src="/js/post-details.js?v=7.2.0"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.2.0"></script>
+
+
+  
+
+  
+
+  
+
+  
+
+
+  
+
+
+  
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
