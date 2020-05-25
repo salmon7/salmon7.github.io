@@ -308,6 +308,187 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2018/09/26/gitlab-ci-docker-compose(6)-容器启动先后顺序.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                
+                <a href="/2018/09/26/gitlab-ci-docker-compose(6)-容器启动先后顺序.html" class="post-title-link" itemprop="url">gitlab ci && docker-compose(6)-容器启动先后顺序</a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2018-09-26 01:27:33" itemprop="dateCreated datePublished" datetime="2018-09-26T01:27:33+08:00">2018-09-26</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <h2 id="docker-compose容器启动先后顺序问题"><a href="#docker-compose容器启动先后顺序问题" class="headerlink" title="docker-compose容器启动先后顺序问题"></a>docker-compose容器启动先后顺序问题</h2><p>App应用程序容器需要连接一个mysql容器，使用docker-compose启动容器组，应该怎么做？在docker-compose中，容器A依赖容器B，B容器会先启动，然后再启动A容器，但是B容器不一定初始化完毕对外服务。</p>
+<p>先来看一段mysql官方对于这种问题的两段说明</p>
+<blockquote>
+<p>No connections until MySQL init completes</p>
+<ul>
+<li>If there is no database initialized when the container starts, then a default database will be created. While this is the expected behavior, this means that it will not accept incoming connections until such initialization completes. This may cause issues when using automation tools, such as docker-compose, which start several containers simultaneously.</li>
+<li>If the application you’re trying to connect to MySQL does not handle MySQL downtime or waiting for MySQL to start gracefully, then a putting a connect-retry loop before the service starts might be necessary. For an example of such an implementation in the official images, see WordPress or Bonita.</li>
+</ul>
+</blockquote>
+<p>所以一般有两种方法解决类似的问题</p>
+<ul>
+<li>程序层面改进，程序连接mysql部分需要有重连机制</li>
+<li>连接容器改进，在shell命令中判断mysql容器是否启动，如果未启动设定时间等待，如果启动了再启动应用程序</li>
+</ul>
+<p><em>这里只说明第二种方法</em></p>
+<h3 id="使用wait-for-it-sh"><a href="#使用wait-for-it-sh" class="headerlink" title="使用wait-for-it.sh"></a>使用wait-for-it.sh</h3><figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># docker-compose.yml</span></span><br><span class="line"><span class="attr">version:</span> <span class="string">'3'</span></span><br><span class="line"></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line"><span class="attr">  app:</span></span><br><span class="line"><span class="attr">    build:</span></span><br><span class="line"><span class="attr">      context:</span> <span class="string">.</span></span><br><span class="line"><span class="attr">      dockerfile:</span> <span class="string">DockerfileAPP</span></span><br><span class="line"><span class="attr">    image:</span> <span class="attr">app:latest</span></span><br><span class="line"><span class="attr">    ports:</span></span><br><span class="line"><span class="bullet">      -</span> <span class="string">"127.0.0.1:8080:8080"</span></span><br><span class="line"><span class="attr">    depends_on:</span></span><br><span class="line"><span class="bullet">      -</span> <span class="string">mysql_db</span></span><br><span class="line"><span class="attr">    command:</span> <span class="string">/go/src/app/wait-for-it.sh</span> <span class="attr">mysql_db:3306</span> <span class="bullet">-s</span> <span class="bullet">-t</span> <span class="number">30</span> <span class="bullet">--</span> <span class="string">/go/src/app/app-release</span> <span class="string">start</span></span><br><span class="line"></span><br><span class="line"><span class="attr">  mysql_db:</span></span><br><span class="line">    <span class="comment">#build:</span></span><br><span class="line">    <span class="comment">#  context: .</span></span><br><span class="line">    <span class="comment">#  dockerfile: DockerfileMySQL</span></span><br><span class="line">    <span class="comment">#image: mysql_db:latest</span></span><br><span class="line"><span class="attr">    image:</span> <span class="string">"mysql:5.7.22"</span></span><br><span class="line"><span class="attr">    environment:</span></span><br><span class="line"><span class="bullet">      -</span> <span class="string">MYSQL_ROOT_PASSWORD=test</span></span><br><span class="line"><span class="attr">    expose:</span></span><br><span class="line"><span class="bullet">      -</span> <span class="string">"3306"</span></span><br><span class="line"><span class="attr">    volume:</span></span><br><span class="line"><span class="bullet">      -</span> <span class="string">./init_sql_script/:/docker-entrypoint-initdb.d/</span></span><br></pre></td></tr></table></figure>
+<p>注意这行代码</p>
+<blockquote>
+<p>command: /go/src/app/wait-for-it.sh mysql_db:3306 -s -t 30 – /go/src/app/app-release start</p>
+</blockquote>
+<p>-s 表示如果没有检测到host为mysql_db的3306端口，则不执行后面的命令；-t 30表示超时时间为30秒，更多配置见参考。wait-for-it.sh可以使用多次，比如需要等待msyql和redis，可以这么写<code>command: /go/src/app/wait-for-it.sh mysql_db:3306 -s -t 30 -- command: /go/src/app/wait-for-it.sh redis:6379 -s -t 30 -- /go/src/app/app-release start</code></p>
+<p>参考：</p>
+<p>mysql官方docker说明：<a href="https://hub.docker.com/_/mysql/" target="_blank" rel="noopener">https://hub.docker.com/_/mysql/</a></p>
+<p>Control startup order in Compose：<a href="https://docs.docker.com/compose/startup-order/" target="_blank" rel="noopener">https://docs.docker.com/compose/startup-order/</a></p>
+<p>vishnubob/wait-for-it：<a href="https://github.com/vishnubob/wait-for-it" target="_blank" rel="noopener">https://github.com/vishnubob/wait-for-it</a></p>
+<p>Docker-compose check if mysql connection is ready：<a href="https://stackoverflow.com/questions/42567475/docker-compose-check-if-mysql-connection-is-ready" target="_blank" rel="noopener">https://stackoverflow.com/questions/42567475/docker-compose-check-if-mysql-connection-is-ready</a></p>
+
+          
+        
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2018/09/25/gitlab-ci-docker-compose(5)-容器启动环境变量传递.html">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1407,7 +1588,7 @@
                 
                   <a href="/archives/">
                 
-                    <span class="site-state-item-count">16</span>
+                    <span class="site-state-item-count">17</span>
                     <span class="site-state-item-name">posts</span>
                   </a>
                 </div>
@@ -1444,7 +1625,9 @@
                     
                       
                     
-                    <span class="site-state-item-count">9</span>
+                      
+                    
+                    <span class="site-state-item-count">10</span>
                     <span class="site-state-item-name">tags</span>
                   </a>
                 </div>
