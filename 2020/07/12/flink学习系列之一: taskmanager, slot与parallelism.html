@@ -94,18 +94,18 @@
 
 
 
-  <meta name="description" content="dockerfileCOPY VS. ADD ADD支持从本地tar文件复制解压，tar文件内的根目录应该包含dockerfile，并且context也限定为tar内部，通常配合docker build 使用，如 docker build - &amp;lt; archive.tar.gz ADD支持url获取，COPY不支持。当使用 docker build - &amp;lt; somefile 传入dock">
-<meta name="keywords" content="docker,gitlabci">
+  <meta name="description" content="如无特别说明，本文讨论的内容均基于 flink 1.7.1   最近一段时间用 flink 写一些 etl 作业，做数据的收集清洗入库，也遇到一些性能问题需要进一步解决，于是计划学习部分flink底层知识。第一篇，跟以前学习spark一样，从flink的并行度说起。  flink作业的启动模式通过 flink YARN Setup 文档我们能够了解到，flink的启动方式大致有两种，一种是先分配">
+<meta name="keywords" content="spark,flink">
 <meta property="og:type" content="article">
-<meta property="og:title" content="gitlab ci &amp;&amp; docker-compose(2)-dockerfile的使用">
-<meta property="og:url" content="http://blog.zhang7long.com/2018/09/16/gitlab-ci-docker-compose(2)-dockerfile的使用.html">
+<meta property="og:title" content="flink学习系列之一: taskmanager, slot与parallelism">
+<meta property="og:url" content="http://blog.zhang7long.com/2020/07/12/flink学习系列之一: taskmanager, slot与parallelism.html">
 <meta property="og:site_name" content="keep running">
-<meta property="og:description" content="dockerfileCOPY VS. ADD ADD支持从本地tar文件复制解压，tar文件内的根目录应该包含dockerfile，并且context也限定为tar内部，通常配合docker build 使用，如 docker build - &amp;lt; archive.tar.gz ADD支持url获取，COPY不支持。当使用 docker build - &amp;lt; somefile 传入dock">
+<meta property="og:description" content="如无特别说明，本文讨论的内容均基于 flink 1.7.1   最近一段时间用 flink 写一些 etl 作业，做数据的收集清洗入库，也遇到一些性能问题需要进一步解决，于是计划学习部分flink底层知识。第一篇，跟以前学习spark一样，从flink的并行度说起。  flink作业的启动模式通过 flink YARN Setup 文档我们能够了解到，flink的启动方式大致有两种，一种是先分配">
 <meta property="og:locale" content="default">
-<meta property="og:updated_time" content="2020-05-17T06:32:49.289Z">
+<meta property="og:updated_time" content="2020-07-12T15:08:59.488Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="gitlab ci &amp;&amp; docker-compose(2)-dockerfile的使用">
-<meta name="twitter:description" content="dockerfileCOPY VS. ADD ADD支持从本地tar文件复制解压，tar文件内的根目录应该包含dockerfile，并且context也限定为tar内部，通常配合docker build 使用，如 docker build - &amp;lt; archive.tar.gz ADD支持url获取，COPY不支持。当使用 docker build - &amp;lt; somefile 传入dock">
+<meta name="twitter:title" content="flink学习系列之一: taskmanager, slot与parallelism">
+<meta name="twitter:description" content="如无特别说明，本文讨论的内容均基于 flink 1.7.1   最近一段时间用 flink 写一些 etl 作业，做数据的收集清洗入库，也遇到一些性能问题需要进一步解决，于是计划学习部分flink底层知识。第一篇，跟以前学习spark一样，从flink的并行度说起。  flink作业的启动模式通过 flink YARN Setup 文档我们能够了解到，flink的启动方式大致有两种，一种是先分配">
 
 
 
@@ -113,7 +113,7 @@
 
   
   
-  <link rel="canonical" href="http://blog.zhang7long.com/2018/09/16/gitlab-ci-docker-compose(2)-dockerfile的使用">
+  <link rel="canonical" href="http://blog.zhang7long.com/2020/07/12/flink学习系列之一: taskmanager, slot与parallelism">
 
 
 
@@ -123,7 +123,7 @@
   };
 </script>
 
-  <title>gitlab ci && docker-compose(2)-dockerfile的使用 | keep running</title>
+  <title>flink学习系列之一: taskmanager, slot与parallelism | keep running</title>
   
 
 
@@ -312,7 +312,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2018/09/16/gitlab-ci-docker-compose(2)-dockerfile的使用.html">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2020/07/12/flink学习系列之一: taskmanager, slot与parallelism.html">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="Long">
@@ -329,7 +329,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">gitlab ci && docker-compose(2)-dockerfile的使用
+          <h1 class="post-title" itemprop="name headline">flink学习系列之一: taskmanager, slot与parallelism
 
               
             
@@ -355,23 +355,13 @@
                 
               
 
-              <time title="Created: 2018-09-16 23:01:21" itemprop="dateCreated datePublished" datetime="2018-09-16T23:01:21+08:00">2018-09-16</time>
+              <time title="Created: 2020-07-12 22:15:43 / Modified: 23:08:59" itemprop="dateCreated datePublished" datetime="2020-07-12T22:15:43+08:00">2020-07-12</time>
             </span>
           
 
           
             
 
-            
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
-              </span>
             
           
 
@@ -407,76 +397,90 @@
       
 
       
-        <h2 id="dockerfile"><a href="#dockerfile" class="headerlink" title="dockerfile"></a>dockerfile</h2><h3 id="COPY-VS-ADD"><a href="#COPY-VS-ADD" class="headerlink" title="COPY VS. ADD"></a>COPY VS. ADD</h3><ul>
-<li>ADD支持从本地tar文件复制解压，tar文件内的根目录应该包含dockerfile，并且context也限定为tar内部，通常配合docker build 使用，如 docker build - &lt; archive.tar.gz</li>
-<li>ADD支持url获取，COPY不支持。当使用 docker build - &lt; somefile 传入dockerfile时，没有context可用，只能使用ADD从一个URL获取context</li>
-<li>ADD的最佳用途是将本地tar文件自动提取到image中，如 ADD rootfs.tar.xz / 。</li>
-<li>它们都是based context，不能复制context之外的东西</li>
-<li>区别：<a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#add-or-copy" target="_blank" rel="noopener">https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#add-or-copy</a></li>
-</ul>
-<h3 id="CMD-VS-ENTRYPOINT"><a href="#CMD-VS-ENTRYPOINT" class="headerlink" title="CMD VS. ENTRYPOINT"></a>CMD VS. ENTRYPOINT</h3><h4 id="CMD："><a href="#CMD：" class="headerlink" title="CMD："></a>CMD：</h4><ul>
-<li>The CMD instruction should be used to run the software contained by your image, along with any arguments. Indeed, this form of the instruction is recommended for any service-based image. like:<ul>
-<li>CMD [“executable”, “param1”, “param2”…]</li>
-<li>CMD [“apache2”,”-DFOREGROUND”]</li>
-</ul>
-</li>
-<li>CMD命令还用在交互式的shell中，如bash，python，perl。例如以下几个用法。 使用这种方式的好处是你能够执行如  docker run -it python 就能直接进入到一个有用的shell中。<ul>
-<li>CMD [“perl”, “-de0”], CMD [“python”], or CMD [“php”, “-a”]</li>
-</ul>
-</li>
-<li>CMD命令很少以 CMD [“param”, “param”] 的出现，这种用法是为了配合 ENTRYPOINT 使用的，所以不要轻易使用这种方式，除非你和你的目标用户清楚ENTRYPOINT是如何工作的</li>
-</ul>
-<h4 id="ENTRYPOINT"><a href="#ENTRYPOINT" class="headerlink" title="ENTRYPOINT:"></a>ENTRYPOINT:</h4><ul>
-<li>ENTRYPOINT的最佳实践是，设置一个主要命令，使得运行image就像运行一个命令一样</li>
-<li>假如有一个image定义了s3cmd命令，ENRTRYPOINT和CMD如下<ul>
-<li>ENTRYPOINT [“s3cmd”]</li>
-<li>CMD [“–help”]</li>
-<li>那么如果直接运行 docker run s3cmd 的话，将会显示 s3cmd 的帮助提示</li>
-<li>或者提供一个参数再执行命令，docker run s3cmd ls s3://mybucket，将会覆盖CMD的–help参数</li>
+        <blockquote>
+<p>如无特别说明，本文讨论的内容均基于 flink 1.7.1</p>
+</blockquote>
+<blockquote>
+<p>最近一段时间用 flink 写一些 etl 作业，做数据的收集清洗入库，也遇到一些性能问题需要进一步解决，于是计划学习部分flink底层知识。第一篇，跟以前学习spark一样，从flink的并行度说起。</p>
+</blockquote>
+<h2 id="flink作业的启动模式"><a href="#flink作业的启动模式" class="headerlink" title="flink作业的启动模式"></a>flink作业的启动模式</h2><p>通过 <a href="https://ci.apache.org/projects/flink/flink-docs-release-1.7/ops/deployment/yarn_setup.html" target="_blank" rel="noopener">flink YARN Setup</a> 文档我们能够了解到，flink的启动方式大致有两种，<br>一种是先分配jobmanager、taskmanager的资源，等待后续提交作业，另一种是在提交的时候申请资源并运行。下面将简单介绍一下这两种启动方式的区别，并着重关注其并行度的计算，最后和spark并行度的计算对对比。</p>
+<h3 id="部署方式一：在yarn中启动一个flink-session，提交job到该session"><a href="#部署方式一：在yarn中启动一个flink-session，提交job到该session" class="headerlink" title="部署方式一：在yarn中启动一个flink session，提交job到该session"></a>部署方式一：在yarn中启动一个flink session，提交job到该session</h3><ul>
+<li>启动flink session<ul>
+<li>./bin/yarn-session.sh -tm 8192 -s 32</li>
+<li>关键配置：<ul>
+<li>-n，指定 container 数量（即taskmanager的数量，不过已经不建议使用，对应的<a href="https://github.com/apache/flink/blob/release-1.7.1/flink-yarn/src/main/java/org/apache/flink/yarn/cli/FlinkYarnSessionCli.java#L373" target="_blank" rel="noopener">源码</a> </li>
+<li>-tm，分配 taskmanager 内存大小</li>
+<li>-jm，分配 jobmanager 内存大小</li>
+<li>-s，每个taskmanager分配slot个数（如果配置了将会覆盖yarn的 parallelism.default 配置，parallelism.default 值默认为1）</li>
+<li>-Dyarn.containers.vcores，在yarn中分配的vcore个数，默认和slot个数一致，即一个slot一个vcore</li>
+<li>默认 taskmanager 的数量为1，并行度为 slot * taskmanager ，<a href="https://github.com/apache/flink/blob/release-1.7.1/flink-yarn/src/main/java/org/apache/flink/yarn/cli/FlinkYarnSessionCli.java#L619" target="_blank" rel="noopener">源码</a></li>
 </ul>
 </li>
-<li>当然ENTRYPOINT也可以是一个sh脚本，可以自定义解析docker run 的时候传入的命令参数</li>
-<li>配置容器启动后执行的命令，并且不可被 docker run 提供的参数覆盖</li>
+<li>一旦 flink session在yarn中启动成功，将会展示有关 jobmanager 连接的详细信息，通过CTRL+C 或者 在client中输入stop关闭 flink session</li>
 </ul>
+</li>
+<li>提交job到该session<ul>
+<li>./bin/flink run ./examples/batch/WordCount.jar </li>
+<li>关键配置：<ul>
+<li>-c，指定入口class</li>
+<li>-m，指定jobmanager地址</li>
+<li>-p，指定作业的并行度</li>
+</ul>
+</li>
+<li>client能够自动识别对应的 jobmanager 地址</li>
+<li>并行度的确定：<ul>
+<li>如果不指定 -p ，则作业并行度为 1 （parallelism.default 的配置值，默认为1）</li>
+<li>如果指定-p，则作业则在该session下，以 -p 指定值的并行度运行。如果作业的并行度大于session的并行度，则会报异常，作业启动失败。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="部署方式二：在yarn中启动一个单独的作业"><a href="#部署方式二：在yarn中启动一个单独的作业" class="headerlink" title="部署方式二：在yarn中启动一个单独的作业"></a>部署方式二：在yarn中启动一个单独的作业</h3><ul>
+<li>./bin/flink run -m yarn-cluster ./examples/batch/WordCount.jar</li>
+<li>flink session的配置同样适用于启动单独的作业，需要加前缀 y 或者 yarn</li>
+<li>关键配置：<ul>
+<li>-n ，允许加载savepoint失败时启动程序</li>
+<li>-d，client非阻塞模式启动作业</li>
+<li>-p，指定作业并行度</li>
+<li>-ytm，分配 taskmanager 内存大小</li>
+<li>-yjm，分配 jobmanager 内存大小</li>
+<li>-ys，指定每个taskmanager分配slot个数</li>
+<li>-yn，指定container数量，和taskmanager数量一致</li>
+</ul>
+</li>
+<li>并行度的确定<ul>
+<li>如果指定了-m yarn-cluster，并且是 -d 或者 -yd 模式，不通过 -yid 指定 applicationid，则其并行度由 -p 决定。</li>
+<li>flink会启动多少个taskmanager？我们知道flink作业的实际并行度是由 taskmanager * slot 决定的，默认情况下每个taskmanager的slot数量为1，所以yarn最终为了实现并行度为 -p 的作业，需要启动p个taskmanager。num( taskmanenger ) = p / slot </li>
+</ul>
+</li>
+</ul>
+<h2 id="spark-on-yarn-vs-flink-on-yarn"><a href="#spark-on-yarn-vs-flink-on-yarn" class="headerlink" title="spark on yarn vs. flink on yarn"></a>spark on yarn vs. flink on yarn</h2><blockquote>
+<p>spark相关的executor以及并行的计算见 Spark学习系列之一和之二</p>
+</blockquote>
+<ul>
+<li>executor vs. taskmanager<ul>
+<li>spark submit 通过 –num-executors 控制executor数量</li>
+<li>flink run 通过 -p 和 -ys 控制taskmanager数量</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>另外spark on standalone模式下，其executor数量的计算方式和flink run差不多，它也是通过总的核数和每个executor核数反算所需的executor数目，可以把 total-executor-cores 类比 -p，executor-cores 类比 -ys）</p>
+</blockquote>
 <a id="more"></a>
-<h4 id="CMD和ENTRYPOINT联合使用："><a href="#CMD和ENTRYPOINT联合使用：" class="headerlink" title="CMD和ENTRYPOINT联合使用："></a>CMD和ENTRYPOINT联合使用：</h4><ul>
-<li>ENTRYPOINT为exec模式时，才能够指定CMD参数和docker run时的参数；</li>
-<li>ENTRYPOINT为shell模式时，CMD参数和docker run的参数都将失效。</li>
-<li>ENTRYPOINT提供默认运行的命令，也可以包含默认的参数</li>
-<li>dockerfile中的CMD提供的默认参数，并且如果在docker run 的时候传入了对应的命令（这时命令应该被理解为参数），则会覆盖CMD的默认参数，添加到ENTRYPOINT后面    </li>
-</ul>
-<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><p>CMD</p>
 <ul>
-<li>一般使用exec模式</li>
-<li>使用shell模式时，将会默认在命令亲前面加上 /bin/sh -c，如 /bin/bash -c “echo $HOME”</li>
-<li>如果要解析主机的环境变量，则要在docker run的时候替换dockerfile中默认的命令</li>
-<li>如果要解析container的环境变量，则要在dockerfile中使用CMD的shell模式，如executable param1 param2，或者在正常exec模式加上”sh”,”-c”，然后具体命令参数只添加到list中的一个参数中，如[“sh”, “-c”, “executable param1 param2”]，</li>
-</ul>
-<p>ENTRYPOINTV</p>
-<ul>
-<li>一般使用exec模式<ul>
-<li>只有exec模式才能与CMD联合使用</li>
-<li>shell模式将会忽略dockerfile中的CMD和docker run时指定的参数</li>
+<li>executor core vs. slot<ul>
+<li>spark submit 通过–executor-cores控制每个executor的core数量，在默认yarn资源调度器（DefaultResourceCalculator）的情况下，并不能保证每个executor实际分配到的core为指定值，但是每个executor会依然认为自己有指定个core，类似于cpu的超卖。</li>
+<li>flink run 中，一个作业的slot总数即为其最大的并行度，而每个slot可以通过 yarn.containers.vcores 配置实际分配到的vcore数量。</li>
 </ul>
 </li>
-<li>如果要使用shell模式，请使用exec来启动命令，如果不加exec将会默认在命令亲前面加上 /bin/sh -c。要确保docker stop能给任何长时间运行的ENTRYPOINT可执行文件正确发出信号，需要记住用 <em>exec</em> 启动它，如 ENTRYPOINT exec executable param1 param2。</li>
-<li>如果使用–entrypoint覆盖默认的ENTRYPOINT，则–entrypoint也必须为exec模式（将不会在命令前添加sh -c），需要注意的是entrypoint只能为一个命令或者shell脚本，不能包含任何参数，参数应该为docker run指定的参数。使用–entrypoint覆盖默认ENTRYPOINT的同时，dockerfile中的CMD也失效，CMD不再作为默认的参数</li>
 </ul>
-<h3 id="context"><a href="#context" class="headerlink" title="context:"></a>context:</h3><ul>
-<li>在执行docker build PATH的时候，PATH即为context，并且PATH目录默认应该有dockerfile文件</li>
-<li>当然也可以使用 -f 指定dockerfile，但是PATH依然是context的唯一依据</li>
-</ul>
-<h3 id="EXPOSE"><a href="#EXPOSE" class="headerlink" title="EXPOSE:"></a>EXPOSE:</h3><ul>
-<li>EXPOSE指令通知Docker容器在运行时侦听指定的网络端口</li>
-</ul>
-<h3 id="参考"><a href="#参考" class="headerlink" title="参考:"></a>参考:</h3><p>dockfile最佳实践：<a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#cmd" target="_blank" rel="noopener">https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#cmd</a></p>
-<p>ci的默认变量：<a href="https://docs.gitlab.com/ce/ci/variables/README.html" target="_blank" rel="noopener">https://docs.gitlab.com/ce/ci/variables/README.html</a></p>
-<p>dockerfile引用参考：<a href="https://docs.docker.com/engine/reference/builder/" target="_blank" rel="noopener">https://docs.docker.com/engine/reference/builder/</a></p>
-<p>ENTRYPOINT和CMD的联合使用：<a href="https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact" target="_blank" rel="noopener">https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact</a></p>
-<p>sudo or gosu：<a href="https://segmentfault.com/a/1190000004527476" target="_blank" rel="noopener">https://segmentfault.com/a/1190000004527476</a></p>
-<p>What does set -e and exec “$@” do for docker entrypoint scripts?：<a href="https://stackoverflow.com/questions/39082768/what-does-set-e-and-exec-do-for-docker-entrypoint-scripts" target="_blank" rel="noopener">https://stackoverflow.com/questions/39082768/what-does-set-e-and-exec-do-for-docker-entrypoint-scripts</a></p>
-<p>bash 内置命令exec （重要！！）：<a href="https://www.cnblogs.com/gandefeng/p/7106742.html" target="_blank" rel="noopener">https://www.cnblogs.com/gandefeng/p/7106742.html</a></p>
-<p>docker run –entrypoint如何添加参数：<a href="https://docs.docker.com/engine/reference/run/#entrypoint-default-command-to-execute-at-runtime" target="_blank" rel="noopener">https://docs.docker.com/engine/reference/run/#entrypoint-default-command-to-execute-at-runtime</a></p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>可以看出 flink 的并行度要比 spark 灵活，它可以通过taskmanger, slot, 算子设置并行度决定实际的运行的并行度。不过这样会导致flink上手难度可能会更高，而一个taskmanager的内存会被slot平均分配，<br>也进一步给作业带来不稳定性。</p>
+<p>参考：<br><a href="https://zhuanlan.zhihu.com/p/92721430" target="_blank" rel="noopener">flink的slot 和parallelism</a><br><a href="https://ci.apache.org/projects/flink/flink-docs-release-1.7/ops/deployment/yarn_setup.html" target="_blank" rel="noopener">flink YARN Setup</a><br><a href="https://ci.apache.org/projects/flink/flink-docs-release-1.7/ops/config.html" target="_blank" rel="noopener">flink Configuration</a><br><a href="https://juejin.im/post/5bf8dd7a51882507e94b8b15" target="_blank" rel="noopener">Flink 集群运行原理兼部署及Yarn运行模式深入剖析-Flink牛刀小试</a><br><a href="https://github.com/apache/flink/blob/release-1.7.1/flink-clients/src/main/java/org/apache/flink/client/cli/CliFrontend.java" target="_blank" rel="noopener">flink 单独运行作业源码</a>  </p>
+<blockquote>
+<p>本文为学习过程中产生的总结，由于学艺不精可能有些观点或者描述有误，还望各位同学帮忙指正，共同进步。</p>
+</blockquote>
 
       
     </div>
@@ -503,9 +507,9 @@
         
         <div class="post-tags">
           
-            <a href="/tags/docker/" rel="tag"># docker</a>
+            <a href="/tags/spark/" rel="tag"># spark</a>
           
-            <a href="/tags/gitlabci/" rel="tag"># gitlabci</a>
+            <a href="/tags/flink/" rel="tag"># flink</a>
           
         </div>
       
@@ -518,8 +522,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2018/09/16/effective-go-learning-1.html" rel="next" title="effective go learning">
-                <i class="fa fa-chevron-left"></i> effective go learning
+              <a href="/2020/05/17/es学习系列之一：Rollover-Index-VS-Index-Lifecycle-Management.html" rel="next" title="es学习系列之一：Rollover Index VS. Index Lifecycle Management">
+                <i class="fa fa-chevron-left"></i> es学习系列之一：Rollover Index VS. Index Lifecycle Management
               </a>
             
           </div>
@@ -527,10 +531,6 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2018/09/18/gitlab-ci-docker-compose(3)-mysql的初始化.html" rel="prev" title="gitlab ci && docker-compose(3)-mysql的初始化">
-                gitlab ci && docker-compose(3)-mysql的初始化 <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -704,7 +704,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#dockerfile"><span class="nav-number">1.</span> <span class="nav-text">dockerfile</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#COPY-VS-ADD"><span class="nav-number">1.1.</span> <span class="nav-text">COPY VS. ADD</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CMD-VS-ENTRYPOINT"><span class="nav-number">1.2.</span> <span class="nav-text">CMD VS. ENTRYPOINT</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#CMD："><span class="nav-number">1.2.1.</span> <span class="nav-text">CMD：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ENTRYPOINT"><span class="nav-number">1.2.2.</span> <span class="nav-text">ENTRYPOINT:</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CMD和ENTRYPOINT联合使用："><span class="nav-number">1.2.3.</span> <span class="nav-text">CMD和ENTRYPOINT联合使用：</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#小结"><span class="nav-number">1.2.4.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#context"><span class="nav-number">1.3.</span> <span class="nav-text">context:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#EXPOSE"><span class="nav-number">1.4.</span> <span class="nav-text">EXPOSE:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#参考"><span class="nav-number">1.5.</span> <span class="nav-text">参考:</span></a></li></ol></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#flink作业的启动模式"><span class="nav-number">1.</span> <span class="nav-text">flink作业的启动模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#部署方式一：在yarn中启动一个flink-session，提交job到该session"><span class="nav-number">1.1.</span> <span class="nav-text">部署方式一：在yarn中启动一个flink session，提交job到该session</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#部署方式二：在yarn中启动一个单独的作业"><span class="nav-number">1.2.</span> <span class="nav-text">部署方式二：在yarn中启动一个单独的作业</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#spark-on-yarn-vs-flink-on-yarn"><span class="nav-number">2.</span> <span class="nav-text">spark on yarn vs. flink on yarn</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
             
 
           </div>

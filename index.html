@@ -308,6 +308,228 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2020/07/12/flink学习系列之一: taskmanager, slot与parallelism.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                
+                <a href="/2020/07/12/flink学习系列之一: taskmanager, slot与parallelism.html" class="post-title-link" itemprop="url">flink学习系列之一: taskmanager, slot与parallelism</a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2020-07-12 22:15:43 / Modified: 23:08:59" itemprop="dateCreated datePublished" datetime="2020-07-12T22:15:43+08:00">2020-07-12</time>
+            </span>
+          
+
+          
+            
+
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <blockquote>
+<p>如无特别说明，本文讨论的内容均基于 flink 1.7.1</p>
+</blockquote>
+<blockquote>
+<p>最近一段时间用 flink 写一些 etl 作业，做数据的收集清洗入库，也遇到一些性能问题需要进一步解决，于是计划学习部分flink底层知识。第一篇，跟以前学习spark一样，从flink的并行度说起。</p>
+</blockquote>
+<h2 id="flink作业的启动模式"><a href="#flink作业的启动模式" class="headerlink" title="flink作业的启动模式"></a>flink作业的启动模式</h2><p>通过 <a href="https://ci.apache.org/projects/flink/flink-docs-release-1.7/ops/deployment/yarn_setup.html" target="_blank" rel="noopener">flink YARN Setup</a> 文档我们能够了解到，flink的启动方式大致有两种，<br>一种是先分配jobmanager、taskmanager的资源，等待后续提交作业，另一种是在提交的时候申请资源并运行。下面将简单介绍一下这两种启动方式的区别，并着重关注其并行度的计算，最后和spark并行度的计算对对比。</p>
+<h3 id="部署方式一：在yarn中启动一个flink-session，提交job到该session"><a href="#部署方式一：在yarn中启动一个flink-session，提交job到该session" class="headerlink" title="部署方式一：在yarn中启动一个flink session，提交job到该session"></a>部署方式一：在yarn中启动一个flink session，提交job到该session</h3><ul>
+<li>启动flink session<ul>
+<li>./bin/yarn-session.sh -tm 8192 -s 32</li>
+<li>关键配置：<ul>
+<li>-n，指定 container 数量（即taskmanager的数量，不过已经不建议使用，对应的<a href="https://github.com/apache/flink/blob/release-1.7.1/flink-yarn/src/main/java/org/apache/flink/yarn/cli/FlinkYarnSessionCli.java#L373" target="_blank" rel="noopener">源码</a> </li>
+<li>-tm，分配 taskmanager 内存大小</li>
+<li>-jm，分配 jobmanager 内存大小</li>
+<li>-s，每个taskmanager分配slot个数（如果配置了将会覆盖yarn的 parallelism.default 配置，parallelism.default 值默认为1）</li>
+<li>-Dyarn.containers.vcores，在yarn中分配的vcore个数，默认和slot个数一致，即一个slot一个vcore</li>
+<li>默认 taskmanager 的数量为1，并行度为 slot * taskmanager ，<a href="https://github.com/apache/flink/blob/release-1.7.1/flink-yarn/src/main/java/org/apache/flink/yarn/cli/FlinkYarnSessionCli.java#L619" target="_blank" rel="noopener">源码</a></li>
+</ul>
+</li>
+<li>一旦 flink session在yarn中启动成功，将会展示有关 jobmanager 连接的详细信息，通过CTRL+C 或者 在client中输入stop关闭 flink session</li>
+</ul>
+</li>
+<li>提交job到该session<ul>
+<li>./bin/flink run ./examples/batch/WordCount.jar </li>
+<li>关键配置：<ul>
+<li>-c，指定入口class</li>
+<li>-m，指定jobmanager地址</li>
+<li>-p，指定作业的并行度</li>
+</ul>
+</li>
+<li>client能够自动识别对应的 jobmanager 地址</li>
+<li>并行度的确定：<ul>
+<li>如果不指定 -p ，则作业并行度为 1 （parallelism.default 的配置值，默认为1）</li>
+<li>如果指定-p，则作业则在该session下，以 -p 指定值的并行度运行。如果作业的并行度大于session的并行度，则会报异常，作业启动失败。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="部署方式二：在yarn中启动一个单独的作业"><a href="#部署方式二：在yarn中启动一个单独的作业" class="headerlink" title="部署方式二：在yarn中启动一个单独的作业"></a>部署方式二：在yarn中启动一个单独的作业</h3><ul>
+<li>./bin/flink run -m yarn-cluster ./examples/batch/WordCount.jar</li>
+<li>flink session的配置同样适用于启动单独的作业，需要加前缀 y 或者 yarn</li>
+<li>关键配置：<ul>
+<li>-n ，允许加载savepoint失败时启动程序</li>
+<li>-d，client非阻塞模式启动作业</li>
+<li>-p，指定作业并行度</li>
+<li>-ytm，分配 taskmanager 内存大小</li>
+<li>-yjm，分配 jobmanager 内存大小</li>
+<li>-ys，指定每个taskmanager分配slot个数</li>
+<li>-yn，指定container数量，和taskmanager数量一致</li>
+</ul>
+</li>
+<li>并行度的确定<ul>
+<li>如果指定了-m yarn-cluster，并且是 -d 或者 -yd 模式，不通过 -yid 指定 applicationid，则其并行度由 -p 决定。</li>
+<li>flink会启动多少个taskmanager？我们知道flink作业的实际并行度是由 taskmanager * slot 决定的，默认情况下每个taskmanager的slot数量为1，所以yarn最终为了实现并行度为 -p 的作业，需要启动p个taskmanager。num( taskmanenger ) = p / slot </li>
+</ul>
+</li>
+</ul>
+<h2 id="spark-on-yarn-vs-flink-on-yarn"><a href="#spark-on-yarn-vs-flink-on-yarn" class="headerlink" title="spark on yarn vs. flink on yarn"></a>spark on yarn vs. flink on yarn</h2><blockquote>
+<p>spark相关的executor以及并行的计算见 Spark学习系列之一和之二</p>
+</blockquote>
+<ul>
+<li>executor vs. taskmanager<ul>
+<li>spark submit 通过 –num-executors 控制executor数量</li>
+<li>flink run 通过 -p 和 -ys 控制taskmanager数量</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>另外spark on standalone模式下，其executor数量的计算方式和flink run差不多，它也是通过总的核数和每个executor核数反算所需的executor数目，可以把 total-executor-cores 类比 -p，executor-cores 类比 -ys）</p>
+</blockquote>
+          <!--noindex-->
+          
+            <div class="post-button text-center">
+              <a class="btn" href="/2020/07/12/flink学习系列之一: taskmanager, slot与parallelism.html#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2020/05/17/es学习系列之一：Rollover-Index-VS-Index-Lifecycle-Management.html">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -368,7 +590,7 @@
                 
                   <span class="post-meta-item-text">Edited on</span>
                 
-                <time title="Modified: 2020-05-25 23:24:11" itemprop="dateModified" datetime="2020-05-25T23:24:11+08:00">2020-05-25</time>
+                <time title="Modified: 2020-07-05 22:36:10" itemprop="dateModified" datetime="2020-07-05T22:36:10+08:00">2020-07-05</time>
               </span>
             
           
@@ -2003,180 +2225,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2018/09/27/gitlab-ci-docker-compose(1)-基础知识.html">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="Long">
-      <meta itemprop="description" content>
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="keep running">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                
-                <a href="/2018/09/27/gitlab-ci-docker-compose(1)-基础知识.html" class="post-title-link" itemprop="url">gitlab ci && docker-compose(1)-基础知识</a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-
-          
-          
-          
-
-          
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-
-              
-                
-              
-
-              <time title="Created: 2018-09-27 00:44:36" itemprop="dateCreated datePublished" datetime="2018-09-27T00:44:36+08:00">2018-09-27</time>
-            </span>
-          
-
-          
-            
-
-            
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
-              </span>
-            
-          
-
-          
-
-          
-            
-            
-          
-
-          
-          
-
-          
-
-          <br>
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <p>工作中需要使用到gitlab ci和docker-compose，而docker是这两者的前提。网上docker学习资料有很多，但是有一大部分是过时的，官网也有详细的文档，但是快速阅读起来比较慢，毕竟不是母语。之前学习的时候走了很多弯路，现把最近搜集到比较好的资料分享出来，希望对大家有帮助</p>
-<h2 id="docker学习资料"><a href="#docker学习资料" class="headerlink" title="docker学习资料"></a>docker学习资料</h2><p>Docker — 从入门到实践（一个不错的docker入门教程，极力推荐）:</p>
-<ul>
-<li><a href="https://github.com/yeasy/docker_practice" target="_blank" rel="noopener">https://github.com/yeasy/docker_practice</a></li>
-<li><a href="https://docker_practice.gitee.io/" target="_blank" rel="noopener">https://docker_practice.gitee.io/</a></li>
-</ul>
-<p>Docker 问答录（100 问）：<a href="https://blog.lab99.org/post/docker-2016-07-14-faq.html" target="_blank" rel="noopener">https://blog.lab99.org/post/docker-2016-07-14-faq.html</a></p>
-<p>dockerfile中：<a href="https://docs.docker.com/engine/reference/builder/" target="_blank" rel="noopener">https://docs.docker.com/engine/reference/builder/</a></p>
-<p>dockerfile的最佳实践：<a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/" target="_blank" rel="noopener">https://docs.docker.com/develop/develop-images/dockerfile_best-practices/</a></p>
-<p>docker之Dockerfile实践（以nginx为例，一步一步构建镜像）：<a href="http://www.cnblogs.com/jsonhc/p/7767669.html" target="_blank" rel="noopener">http://www.cnblogs.com/jsonhc/p/7767669.html</a></p>
-<h2 id="docker-compose学习资料"><a href="#docker-compose学习资料" class="headerlink" title="docker-compose学习资料"></a>docker-compose学习资料</h2><p>docker-compose中的environment：<a href="https://docs.docker.com/compose/compose-file/#environment" target="_blank" rel="noopener">https://docs.docker.com/compose/compose-file/#environment</a></p>
-<p>docker-compose中的变量：<a href="https://docs.docker.com/compose/compose-file/#variable-substitution" target="_blank" rel="noopener">https://docs.docker.com/compose/compose-file/#variable-substitution</a></p>
-<p>docker-comppose中的变量的优先顺序：<a href="https://docs.docker.com/compose/environment-variables/" target="_blank" rel="noopener">https://docs.docker.com/compose/environment-variables/</a></p>
-<p>Declare default environment variables in file：<a href="https://docs.docker.com/compose/env-file/" target="_blank" rel="noopener">https://docs.docker.com/compose/env-file/</a></p>
-<p>ENTRYPOINT的shell模式的副作用：<a href="https://docs.docker.com/engine/reference/builder/#entrypoint" target="_blank" rel="noopener">https://docs.docker.com/engine/reference/builder/#entrypoint</a></p>
-<p>vishnubob/wait-for-it <a href="https://github.com/vishnubob/wait-for-it" target="_blank" rel="noopener">https://github.com/vishnubob/wait-for-it</a></p>
-<p>dockfile最佳实践：<a href="https://docs.docker.com/develop/develop-images/dockerfile_best-practices/" target="_blank" rel="noopener">https://docs.docker.com/develop/develop-images/dockerfile_best-practices/</a></p>
-<h2 id="gitlab-ci学习资料"><a href="#gitlab-ci学习资料" class="headerlink" title="gitlab-ci学习资料"></a>gitlab-ci学习资料</h2><p>这部分学习大部分都是官网，不做过多的分享，只留一个默认变量的链接</p>
-<p>ci的默认变量：<a href="https://docs.gitlab.com/ce/ci/variables/README.html" target="_blank" rel="noopener">https://docs.gitlab.com/ce/ci/variables/README.html</a></p>
-
-          
-        
-      
-    </div>
-
-    
-
-    
-    
-    
-
-    
-
-    
-      
-    
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
   </section>
 
   
@@ -2223,7 +2271,7 @@
                 
                   <a href="/archives/">
                 
-                    <span class="site-state-item-count">17</span>
+                    <span class="site-state-item-count">18</span>
                     <span class="site-state-item-name">posts</span>
                   </a>
                 </div>
@@ -2262,7 +2310,9 @@
                     
                       
                     
-                    <span class="site-state-item-count">10</span>
+                      
+                    
+                    <span class="site-state-item-count">11</span>
                     <span class="site-state-item-name">tags</span>
                   </a>
                 </div>
