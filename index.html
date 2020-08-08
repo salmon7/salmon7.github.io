@@ -530,6 +530,288 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2020/07/05/es学习系列之二：Aggregation-Optimization.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                
+                <a href="/2020/07/05/es学习系列之二：Aggregation-Optimization.html" class="post-title-link" itemprop="url">es学习系列之二：Aggregation Optimization</a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2020-07-05 16:59:15" itemprop="dateCreated datePublished" datetime="2020-07-05T16:59:15+08:00">2020-07-05</time>
+            </span>
+          
+
+          
+            
+
+            
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                
+                  <span class="post-meta-item-text">Edited on</span>
+                
+                <time title="Modified: 2020-07-12 23:12:22" itemprop="dateModified" datetime="2020-07-12T23:12:22+08:00">2020-07-12</time>
+              </span>
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <blockquote>
+<p>如无特别说明，本文讨论的内容均基于 es 7.*</p>
+</blockquote>
+<h2 id="20w-s-ops索引的聚合"><a href="#20w-s-ops索引的聚合" class="headerlink" title="20w/s ops索引的聚合"></a>20w/s ops索引的聚合</h2><p>我们有个常用的查询入口，默认根据查询条件聚合某个id近1小时的数据（每条聚合结果大部分情况下文档数量为1），再根据id去es里面查找对应的文档（一个id可能对应多个文档）</p>
+<h3 id="集群基础情况-amp-amp-索引关键配置"><a href="#集群基础情况-amp-amp-索引关键配置" class="headerlink" title="集群基础情况 &amp;&amp; 索引关键配置"></a>集群基础情况 &amp;&amp; 索引关键配置</h3><ul>
+<li><p>集群的节点分布</p>
+<ul>
+<li>2 client</li>
+<li>3 master</li>
+<li>26 ssd机器</li>
+<li>5 sata机器</li>
+</ul>
+</li>
+<li><p>索引配置</p>
+<ul>
+<li>25个shard，1个replica</li>
+<li>refresh interval 配置为 60s，即”index.refresh_interval”: “60s”</li>
+<li>主shard 8TB/天，加上replica约16TB/天</li>
+<li>日志量峰值 20w/s，主shard索引速度峰值 20w/s，加上replica约40w/s</li>
+</ul>
+</li>
+</ul>
+<h3 id="优化一：时间序列索引的时间条件"><a href="#优化一：时间序列索引的时间条件" class="headerlink" title="优化一：时间序列索引的时间条件"></a>优化一：时间序列索引的时间条件</h3><p>对于时间序列的索引，我们搜索时一般都都需要加上末尾加上 <code>*</code> 进行匹配，如<code>nginx_log-*</code>，这时我们需要在query中添加时间range条件，这样es会自动过滤不符合时间条件的索引，减少查询数量，<br>否则会匹配索所有的索引，如果数据量很大的话，会减慢查询速度。</p>
+<h3 id="优化二：refresh-interval-对-golbal-ordinal的影响"><a href="#优化二：refresh-interval-对-golbal-ordinal的影响" class="headerlink" title="优化二：refresh interval 对 golbal ordinal的影响"></a>优化二：refresh interval 对 golbal ordinal的影响</h3><h4 id="生成-segment-的条件"><a href="#生成-segment-的条件" class="headerlink" title="生成 segment 的条件"></a>生成 segment 的条件</h4><ol>
+<li>index buffer 被占满，默认为jvm的10% <a href="https://elastic.co/guide/en/elasticsearch/reference/7.2/indexing-buffer.html" target="_blank" rel="noopener">https://elastic.co/guide/en/elasticsearch/reference/7.2/indexing-buffer.html</a> </li>
+<li>每 refresh 一次就生成一个segment。(merge操作会定时合并小的segments为大的segment，保持segments在一定的数量范围内，<a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/index-modules-merge.html" target="_blank" rel="noopener">https://www.elastic.co/guide/en/elasticsearch/reference/7.2/index-modules-merge.html</a>)</li>
+<li>查看 segments 的数量：</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"># 发出查询后，在30s内，均能看对应的segment的变化，超过30s后如果没有新请求，则不会进行refresh（30s 是通过 index.search.idle.after 配置的，兼顾查询速度和减少segment增长数量）</span><br><span class="line"># https://www.elastic.co/guide/en/elasticsearch/reference/7.4/cluster-nodes-stats.html</span><br><span class="line">GET /_nodes/stats/indices/segments?level=indices&amp;nodeId=xxxx</span><br><span class="line"></span><br><span class="line">或者</span><br><span class="line"></span><br><span class="line"># 这个会比较延迟一点，不过segments情况更加详细，包括了总的（即可查询）的segments以及提交了segments</span><br><span class="line"># https://www.elastic.co/guide/en/elasticsearch/reference/7.2/indices-segments.html</span><br><span class="line">GET nginx_log-2020.07.05-000023/_segments</span><br></pre></td></tr></table></figure>
+<h4 id="global-ordinal"><a href="#global-ordinal" class="headerlink" title="global ordinal"></a>global ordinal</h4><p>1.对于keyword等类型，es为了节省内存空间，在 <strong>segment</strong> 层面使用了根据自增整数或者词典顺序生成的 <strong>序数</strong> 代表每个keyword值。假设keyword类型字段msg，有一个文档的msg=”hello”，<br>其对应的序数为12345，这样对于每个文档对应的keyword字段如果为”hello”存的就是1234。<br>如果hello在mesg字段中重复多次，那么每个文档msg字段的docvalues只要存 12345 即可。简化计算方式，相比48个字节的hello，存储12345只要32个字节。为了便于理解，下面给了两个简单的例子，第一个是我们直观的存储，第二个是es实际的数据结构。</p>
+<table>
+<thead>
+<tr>
+<th>doc_id</th>
+<th>msg: doc values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>doc_1</td>
+<td>“hello”, “world”</td>
+</tr>
+<tr>
+<td>doc_2</td>
+<td>“hello”</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>doc_id</th>
+<th>msg: doc values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>doc_1</td>
+<td>12345, 45678</td>
+</tr>
+<tr>
+<td>doc_2</td>
+<td>12345</td>
+</tr>
+</tbody>
+</table>
+<p>2.现在我们知道doc value中存的都是序数，那么在单个shard聚合msg字段的时候，只要把相同的序数放到同一个桶即可，这样可以加快聚合速度，最后返回的时候把序数替换成对应的值即可。但是序数是基于segment的，同一个字符串在不同segment的序数可能不同，<br>因此需要一个在所有的segment之上构建一个 global ordinal map。如：  </p>
+<table>
+<thead>
+<tr>
+<th>segment_id</th>
+<th>doc_id</th>
+<th>msg: doc values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>seg_1</td>
+<td>doc_1</td>
+<td>12345, 45678</td>
+</tr>
+<tr>
+<td>seg_1</td>
+<td>doc_2</td>
+<td>12345</td>
+</tr>
+<tr>
+<td>seg_2</td>
+<td>doc_3</td>
+<td>54321, 87654</td>
+</tr>
+<tr>
+<td>seg_2</td>
+<td>doc_4</td>
+<td>54321</td>
+</tr>
+</tbody>
+</table>
+<p>global ordinal map:<br>seg_1: 12345 -&gt; hello, 45678 -&gt; world<br>seg_2: 54321 -&gt; hello, 87654 -&gt; world</p>
+<p>3.global ordinal的构建/维持逻辑</p>
+<ul>
+<li>构建 global ordinal map可能很耗时<ul>
+<li>如果shard很大，对应的聚合字段可能会包含很多不同类型的值，则构建gloabl ordinal map可能会很耗时</li>
+<li>同理，如果对应的聚合字段为大量的唯一值（比如requestID，在一定时间内几乎不可能相同），那么构建global ordinal map也会很耗费资源</li>
+<li>小结：构建 global ordinal 比传输字段原始值更耗资源，比如上面的msg字段有5w个唯一的值，并且平均分布在5个segment中，那么需要考虑两种方法：第一种，根据每个segment的ordinal map构建size大小为5w的global ordinal map后，再根据global ordinal聚合得到聚合结果，最后转为原始值返回；第二种，直接把这5w个ordinal转为原始值，直接聚合。</li>
+</ul>
+</li>
+<li>global orinal map 可能会失效<ul>
+<li>因为global ordinals为分片上的所有segments提供了统一的mapping，所以当一个新的segment变为可见时，还需要完全重建它们。（Because global ordinals provide a unified mapping for all segments on the shard, they also need to be rebuilt entirely when a new segment becomes visible. ）</li>
+<li>小结：对于refresh interval比较小的索引，每次聚合查询都会重新构建 global ordinla map。</li>
+</ul>
+</li>
+</ul>
+<p>global ordinal<br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/tune-for-search-speed.html#_warm_up_global_ordinals" target="_blank" rel="noopener">https://www.elastic.co/guide/en/elasticsearch/reference/7.2/tune-for-search-speed.html#_warm_up_global_ordinals</a></p>
+<p>eager_global_ordinals<br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/eager-global-ordinals.html#eager-global-ordinals" target="_blank" rel="noopener">https://www.elastic.co/guide/en/elasticsearch/reference/7.2/eager-global-ordinals.html#eager-global-ordinals</a></p>
+<ul>
+<li>25个shard<br>1.说明基础情况，数据量级，node情况<br>2.refresh interval，60s，时间序列情况<br>3.优化情况</li>
+</ul>
+<p>为了避免 shard cache 对聚合结果的影响，我们在聚合时带上request_cache=false 参数。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br></pre></td><td class="code"><pre><span class="line"># 观察 global ordinal map耗费的资源</span><br><span class="line">GET /_nodes/stats/indices/fielddata?level=indices&amp;fields=traceID</span><br><span class="line"></span><br><span class="line">返回：</span><br><span class="line">        &quot;tracing_common_lbc_jaeger_span-2020.07.05-000204&quot; : &#123;</span><br><span class="line">            &quot;fielddata&quot; : &#123;</span><br><span class="line">              &quot;memory_size_in_bytes&quot; : 10120,</span><br><span class="line">              &quot;evictions&quot; : 0,</span><br><span class="line">              &quot;fields&quot; : &#123; &#125;</span><br><span class="line">            &#125;</span><br><span class="line">          &#125;,</span><br><span class="line"># 可以看到，es并没有提交为 traceID 提前创建 global ordinals </span><br><span class="line"></span><br><span class="line"># 观察数据大小</span><br><span class="line"># 13:00-14:00 数据数目为541948948，约5.4亿条</span><br><span class="line">GET /tracing_common_lbc_jaeger_span-2020.07.05-000204/_count</span><br><span class="line">&#123;</span><br><span class="line">  &quot;query&quot;: &#123;</span><br><span class="line">    &quot;bool&quot;: &#123;</span><br><span class="line">      &quot;must&quot;: [</span><br><span class="line">        &#123;</span><br><span class="line">          &quot;range&quot;: &#123;</span><br><span class="line">            &quot;startTimeMillis&quot;: &#123;</span><br><span class="line">              &quot;from&quot;: 1593925200000,</span><br><span class="line">              &quot;include_lower&quot;: true,</span><br><span class="line">              &quot;include_upper&quot;: true,</span><br><span class="line">              &quot;to&quot;: 1593928800000</span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">          &quot;match&quot;: &#123;</span><br><span class="line">            &quot;process.serviceName&quot;: &#123;</span><br><span class="line">              &quot;query&quot;: &quot;lbc&quot;</span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;</span><br><span class="line">      ]</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">返回：</span><br><span class="line">&#123;</span><br><span class="line">  &quot;count&quot; : 541948948,</span><br><span class="line">  &quot;_shards&quot; : &#123;</span><br><span class="line">    &quot;total&quot; : 25,</span><br><span class="line">    &quot;successful&quot; : 25,</span><br><span class="line">    &quot;skipped&quot; : 0,</span><br><span class="line">    &quot;failed&quot; : 0</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"># 执行聚合，耗时约 40s </span><br><span class="line">GET /tracing_common_lbc_jaeger_span-2020.07.05-000204/_search?request_cache=false</span><br><span class="line">&#123;</span><br><span class="line">    &quot;took&quot;: 39407,</span><br><span class="line">    &quot;timed_out&quot;: false,</span><br><span class="line">    &quot;_shards&quot;: &#123;</span><br><span class="line">        &quot;total&quot;: 25,</span><br><span class="line">        &quot;successful&quot;: 25,</span><br><span class="line">        &quot;skipped&quot;: 0,</span><br><span class="line">        &quot;failed&quot;: 0</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;hits&quot;: &#123;</span><br><span class="line">        &quot;total&quot;: &#123;</span><br><span class="line">            &quot;value&quot;: 10000,</span><br><span class="line">            &quot;relation&quot;: &quot;gte&quot;</span><br><span class="line">        &#125;,</span><br><span class="line">        &quot;max_score&quot;: null,</span><br><span class="line">        &quot;hits&quot;: []</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;aggregations&quot;: &#123;</span><br><span class="line">        &quot;traceIDs&quot;: &#123;</span><br><span class="line">            .......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"># 执行聚合后，观察 ordinal 的数量，48mb的缓存</span><br><span class="line">GET /_nodes/stats/indices/fielddata?level=indices&amp;fields=traceID</span><br><span class="line"></span><br><span class="line">返回：</span><br><span class="line">          &quot;tracing_common_lbc_jaeger_span-2020.07.05-000204&quot; : &#123;</span><br><span class="line">            &quot;fielddata&quot; : &#123;</span><br><span class="line">              &quot;memory_size_in_bytes&quot; : 406626768,</span><br><span class="line">              &quot;evictions&quot; : 0,</span><br><span class="line">              &quot;fields&quot; : &#123;</span><br><span class="line">                &quot;traceID&quot; : &#123;</span><br><span class="line">                  &quot;memory_size_in_bytes&quot; : 406616120</span><br><span class="line">                &#125;</span><br><span class="line">              &#125;</span><br><span class="line">            &#125;</span><br><span class="line">          &#125;,</span><br></pre></td></tr></table></figure>
+<h2 id="Index-Lifecycle-Management"><a href="#Index-Lifecycle-Management" class="headerlink" title="Index Lifecycle Management"></a>Index Lifecycle Management</h2><p>cdn索引的优化：</p>
+<h2 id="聚合查询的优化"><a href="#聚合查询的优化" class="headerlink" title="聚合查询的优化"></a>聚合查询的优化</h2><p>1.refresh interval<br>2.shard request cache<br>3.global ordinal 的影响<br>4.shard数量的影响<br>5.时间序列的影响</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"># 查看对应的 global ordinal 占用的内存（对于keyword类型，fieldata就是其global ordinal占用的内存）</span><br><span class="line">GET /_nodes/stats/indices/fielddata?level=indices&amp;fields=traceID</span><br><span class="line"></span><br><span class="line">          &quot;tracing_common_cdn_jaeger_span-2020.07.01-000019&quot; : &#123;</span><br><span class="line">            &quot;fielddata&quot; : &#123;</span><br><span class="line">              &quot;memory_size_in_bytes&quot; : 258403624,</span><br><span class="line">              &quot;evictions&quot; : 0,</span><br><span class="line">              &quot;fields&quot; : &#123;</span><br><span class="line">                &quot;traceID&quot; : &#123;</span><br><span class="line">                  &quot;memory_size_in_bytes&quot; : 258401160</span><br><span class="line">                &#125;</span><br><span class="line">              &#125;</span><br><span class="line">            &#125;</span><br><span class="line">          &#125;,</span><br><span class="line"></span><br><span class="line">          &quot;tracing_common_cdn_jaeger_span-2020.07.01-000019&quot; : &#123;</span><br><span class="line">            &quot;fielddata&quot; : &#123;</span><br><span class="line">              &quot;memory_size_in_bytes&quot; : 263655552,</span><br><span class="line">              &quot;evictions&quot; : 0,</span><br><span class="line">              &quot;fields&quot; : &#123;</span><br><span class="line">                &quot;traceID&quot; : &#123;</span><br><span class="line">                  &quot;memory_size_in_bytes&quot; : 263652224</span><br><span class="line">                &#125;</span><br><span class="line">              &#125;</span><br><span class="line">            &#125;</span><br><span class="line">          &#125;,</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">&quot;tracing_common_cdn_jaeger_span-2020.07.01-000019&quot; : &#123;</span><br><span class="line">  &quot;fielddata&quot; : &#123;</span><br><span class="line">    &quot;memory_size_in_bytes&quot; : 258403624,</span><br><span class="line">    &quot;evictions&quot; : 0,</span><br><span class="line">    &quot;fields&quot; : &#123;</span><br><span class="line">      &quot;traceID&quot; : &#123;</span><br><span class="line">        &quot;memory_size_in_bytes&quot; : 258401160</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;,</span><br><span class="line"></span><br><span class="line">&quot;tracing_common_cdn_jaeger_span-2020.07.01-000019&quot; : &#123;</span><br><span class="line">  &quot;fielddata&quot; : &#123;</span><br><span class="line">    &quot;memory_size_in_bytes&quot; : 263655552,</span><br><span class="line">    &quot;evictions&quot; : 0,</span><br><span class="line">    &quot;fields&quot; : &#123;</span><br><span class="line">      &quot;traceID&quot; : &#123;</span><br><span class="line">        &quot;memory_size_in_bytes&quot; : 263652224</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;,</span><br></pre></td></tr></table></figure>
+<h2 id="改成filter-能否领用-node-query-cache"><a href="#改成filter-能否领用-node-query-cache" class="headerlink" title="改成filter 能否领用 node query cache"></a>改成filter 能否领用 node query cache</h2><blockquote>
+<p>本文为学习过程中产生的总结，由于学艺不精可能有些观点或者描述有误，还望各位同学帮忙指正，共同进步。</p>
+</blockquote>
+
+          
+        
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2020/05/17/es学习系列之一：Rollover-Index-VS-Index-Lifecycle-Management.html">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -590,7 +872,7 @@
                 
                   <span class="post-meta-item-text">Edited on</span>
                 
-                <time title="Modified: 2020-07-05 22:36:10" itemprop="dateModified" datetime="2020-07-05T22:36:10+08:00">2020-07-05</time>
+                <time title="Modified: 2020-08-08 15:17:48" itemprop="dateModified" datetime="2020-08-08T15:17:48+08:00">2020-08-08</time>
               </span>
             
           
@@ -2049,182 +2331,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2018/09/29/go系列-中间件.html">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="Long">
-      <meta itemprop="description" content>
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="keep running">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                
-                <a href="/2018/09/29/go系列-中间件.html" class="post-title-link" itemprop="url">go系列-中间件</a>
-              
-            
-          </h1>
-        
-
-        <div class="post-meta">
-
-          
-          
-          
-
-          
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-
-              
-                
-              
-
-              <time title="Created: 2018-09-29 01:02:32" itemprop="dateCreated datePublished" datetime="2018-09-29T01:02:32+08:00">2018-09-29</time>
-            </span>
-          
-
-          
-            
-
-            
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
-              </span>
-            
-          
-
-          
-
-          
-            
-            
-          
-
-          
-          
-
-          
-
-          <br>
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <h2 id="go中间件"><a href="#go中间件" class="headerlink" title="go中间件"></a>go中间件</h2><p>最近看代码看到go中间件的代码，遂搜相关代码以及类似的框架进行学习 </p>
-<h3 id="什么是中间件"><a href="#什么是中间件" class="headerlink" title="什么是中间件"></a>什么是中间件</h3><ul>
-<li><p>了解中间件前需要了解 ServeMux、DefaultServeMux、http.Handler、http.HandlerFunc、mux.HandleFunc、ServeHTTP 等相关知识和它们之间的关系[推荐]<br><a href="https://www.alexedwards.net/blog/a-recap-of-request-handling" target="_blank" rel="noopener">https://www.alexedwards.net/blog/a-recap-of-request-handling</a></p>
-</li>
-<li><p>context能做什么<br><a href="https://blog.questionable.services/article/map-string-interface/" target="_blank" rel="noopener">https://blog.questionable.services/article/map-string-interface/</a></p>
-</li>
-</ul>
-<h3 id="gorilla系列-amp-Negroni"><a href="#gorilla系列-amp-Negroni" class="headerlink" title="gorilla系列 &amp; Negroni"></a>gorilla系列 &amp; Negroni</h3><ul>
-<li><p>Go实战–Golang中http中间件(goji/httpauth、urfave/negroni、gorilla/handlers、justinas/alice)<br><a href="https://blog.csdn.net/wangshubo1989/article/details/79227443" target="_blank" rel="noopener">https://blog.csdn.net/wangshubo1989/article/details/79227443</a></p>
-</li>
-<li><p>Go实战–Gorilla web toolkit使用之gorilla/handlers<br><a href="https://blog.csdn.net/wangshubo1989/article/details/78970282" target="_blank" rel="noopener">https://blog.csdn.net/wangshubo1989/article/details/78970282</a></p>
-</li>
-<li><p>Go实战–Gorilla web toolkit使用之gorilla/context<br><a href="https://blog.csdn.net/wangshubo1989/article/details/78910935" target="_blank" rel="noopener">https://blog.csdn.net/wangshubo1989/article/details/78910935</a></p>
-</li>
-<li><p>gorilla/mux <a href="https://github.com/gorilla/mux" target="_blank" rel="noopener">https://github.com/gorilla/mux</a> (需要着重看一下 文中的Graceful Shutdown和 <a href="https://github.com/gorilla/mux#graceful-shutdown）" target="_blank" rel="noopener">https://github.com/gorilla/mux#graceful-shutdown）</a></p>
-</li>
-<li><p>Negroni <a href="https://github.com/urfave/negroni" target="_blank" rel="noopener">https://github.com/urfave/negroni</a></p>
-</li>
-</ul>
-<p>[代码学习](<a href="https://github.com/salmon7/go-learning/tree/master/middle" target="_blank" rel="noopener">https://github.com/salmon7/go-learning/tree/master/middle</a></p>
-<h3 id="justinas-alice"><a href="#justinas-alice" class="headerlink" title="justinas/alice"></a>justinas/alice</h3><p>// TO-DO</p>
-
-          
-        
-      
-    </div>
-
-    
-
-    
-    
-    
-
-    
-
-    
-      
-    
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
   </section>
 
   
@@ -2271,7 +2377,7 @@
                 
                   <a href="/archives/">
                 
-                    <span class="site-state-item-count">18</span>
+                    <span class="site-state-item-count">19</span>
                     <span class="site-state-item-name">posts</span>
                   </a>
                 </div>
@@ -2312,7 +2418,9 @@
                     
                       
                     
-                    <span class="site-state-item-count">11</span>
+                      
+                    
+                    <span class="site-state-item-count">12</span>
                     <span class="site-state-item-name">tags</span>
                   </a>
                 </div>
