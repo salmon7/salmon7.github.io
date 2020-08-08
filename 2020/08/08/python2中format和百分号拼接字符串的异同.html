@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang>
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
+
+<link rel="stylesheet" href="/css/main.css?v=7.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
+
+
+
+
+
+
+
+<script id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '7.2.0',
+    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
+    back2top: true,
+    back2top_sidebar: false,
+    fancybox: false,
+    fastclick: false,
+    lazyload: false,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+  
+
+
+
+
+  <meta name="description" content="基础知识相信python2的编码问题大多数开发同学都遇到过，在出现非 ascii 编码字符时，就很容易编码异常的问题。python2的字符编码分为 str 以及 unicode，具体情况这里不再敖述，只会总结字符串拼接时应该注意的问题以及可能遇到的坑点。 以下几点常识是下面进一步讨论问题的基础：  str转为unicode的过程，称为解码，即 decode。 unicode转为str，称为编码，即">
+<meta name="keywords" content="python2,python3,编码">
+<meta property="og:type" content="article">
+<meta property="og:title" content="python2中format和%拼接字符串的异同">
+<meta property="og:url" content="http://blog.zhang7long.com/2020/08/08/python2中format和百分号拼接字符串的异同.html">
+<meta property="og:site_name" content="keep running">
+<meta property="og:description" content="基础知识相信python2的编码问题大多数开发同学都遇到过，在出现非 ascii 编码字符时，就很容易编码异常的问题。python2的字符编码分为 str 以及 unicode，具体情况这里不再敖述，只会总结字符串拼接时应该注意的问题以及可能遇到的坑点。 以下几点常识是下面进一步讨论问题的基础：  str转为unicode的过程，称为解码，即 decode。 unicode转为str，称为编码，即">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2020-08-08T09:01:57.801Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="python2中format和%拼接字符串的异同">
+<meta name="twitter:description" content="基础知识相信python2的编码问题大多数开发同学都遇到过，在出现非 ascii 编码字符时，就很容易编码异常的问题。python2的字符编码分为 str 以及 unicode，具体情况这里不再敖述，只会总结字符串拼接时应该注意的问题以及可能遇到的坑点。 以下几点常识是下面进一步讨论问题的基础：  str转为unicode的过程，称为解码，即 decode。 unicode转为str，称为编码，即">
+
+
+
+
+
+  
+  
+  <link rel="canonical" href="http://blog.zhang7long.com/2020/08/08/python2中format和百分号拼接字符串的异同">
+
+
+
+<script id="page.configurations">
+  CONFIG.page = {
+    sidebar: "",
+  };
+</script>
+
+  <title>python2中format和%拼接字符串的异同 | keep running</title>
+  
+
+
+
+
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .motion-element,
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-title { opacity: initial; }
+
+  .use-motion .logo,
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">keep running</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+    
+    
+  </div>
+
+  <div class="site-nav-toggle">
+    <button aria-label="Toggle navigation bar">
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  
+    <ul id="menu" class="menu">
+      
+        
+        
+        
+          
+          <li class="menu-item menu-item-home">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-tags">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
+
+  </li>
+        
+        
+        
+          
+          <li class="menu-item menu-item-archives">
+
+    
+    
+      
+    
+
+    
+
+    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
+
+  </li>
+
+      
+      
+    </ul>
+  
+
+  
+
+  
+</nav>
+
+
+
+  
+
+
+
+</div>
+    </header>
+
+    
+
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+            
+
+          
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2020/08/08/python2中format和百分号拼接字符串的异同.html">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Long">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="keep running">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">python2中format和%拼接字符串的异同
+
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+
+          
+          
+          
+
+          
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+
+              
+                
+              
+
+              <time title="Created: 2020-08-08 15:25:55 / Modified: 17:01:57" itemprop="dateCreated datePublished" datetime="2020-08-08T15:25:55+08:00">2020-08-08</time>
+            </span>
+          
+
+          
+            
+
+            
+          
+
+          
+
+          
+            
+            
+          
+
+          
+          
+
+          
+
+          <br>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="基础知识"><a href="#基础知识" class="headerlink" title="基础知识"></a>基础知识</h3><p>相信python2的编码问题大多数开发同学都遇到过，在出现非 ascii 编码字符时，就很容易编码异常的问题。python2的字符编码分为 str 以及 unicode，具体情况这里不再敖述，只会总结字符串拼接时应该注意的问题以及可能遇到的坑点。</p>
+<p>以下几点常识是下面进一步讨论问题的基础：</p>
+<ul>
+<li>str转为unicode的过程，称为解码，即 decode。</li>
+<li>unicode转为str，称为编码，即 encode。</li>
+<li>使用<code>%</code>把str和unicode拼接，会自动隐式地把str转为unicode后，再进行拼接。（如果是fomat拼接呢？这里留个悬念，答案稍后揭晓）</li>
+<li>当导入<strong>future</strong>包的unicode_literals特性时，python定义的字符都是unicode，而不是默认的str。这个也是为了让python2能够导入python3的特性，因为在python3中的str都是unicode。</li>
+</ul>
+<h3 id="拼接字符串"><a href="#拼接字符串" class="headerlink" title="% 拼接字符串"></a><code>%</code> 拼接字符串</h3><p>我们首先看看pyhon2中的使用<code>%</code>字符串拼接情况。从第一组结果来看，我们可以看到只要格式化串和字符串参数其中一个为unicode，最终结果就为unicode，这个和上面讲的第三点一致。在对str和unicode拼接的时候，会自动把str转为unicode，如第二组的中间两个结果。</p>
+<p>但是我们需要注意编码的问题，如第2个结果，由于”中文”是非 acsii 编码，而且python解释器不知道其类型，会用ascii编码对其进行解码，相当于 <code>u&quot;%s&quot; % (&quot;中文&quot;).decode(&quot;ascii&quot;)</code>，而ascii不认识非 0~127 编码所以就报错，当然我们可以手动指定用”utf-8”进行解码。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">"%s"</span> % (<span class="string">"hello"</span>))</span><br><span class="line">&lt;type <span class="string">'str'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">u"%s"</span> % (<span class="string">"hello"</span>))</span><br><span class="line">&lt;type <span class="string">'unicode'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">"%s"</span> % (<span class="string">u"hello"</span>))</span><br><span class="line">&lt;type <span class="string">'unicode'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">u"%s"</span> % (<span class="string">u"hello"</span>))</span><br><span class="line">&lt;type <span class="string">'unicode'</span>&gt;</span><br><span class="line">&gt;&gt;&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">"%s"</span> % (<span class="string">"中文"</span>))</span><br><span class="line">&lt;type <span class="string">'str'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">u"%s"</span> % (<span class="string">"中文"</span>))         <span class="comment"># 最终结果为unicode，会隐式地通过ascii编码把"中文"解码为unicode</span></span><br><span class="line">Traceback (most recent call last):</span><br><span class="line">  File <span class="string">"&lt;stdin&gt;"</span>, line <span class="number">1</span>, <span class="keyword">in</span> &lt;module&gt;</span><br><span class="line">UnicodeDecodeError: <span class="string">'ascii'</span> codec can<span class="string">'t decode byte 0xe4 in position 0: ordinal not in range(128)</span></span><br><span class="line"><span class="string">&gt;&gt;&gt; type(u"%s" % ("中文".decode("utf-8")))</span></span><br><span class="line"><span class="string">&lt;type '</span>unicode<span class="string">'&gt;</span></span><br><span class="line"><span class="string">&gt;&gt;&gt; type("%s" % (u"中文"))</span></span><br><span class="line"><span class="string">&lt;type '</span>unicode<span class="string">'&gt;</span></span><br><span class="line"><span class="string">&gt;&gt;&gt; type(u"%s" % (u"中文"))</span></span><br><span class="line"><span class="string">&lt;type '</span>unicode<span class="string">'&gt;</span></span><br></pre></td></tr></table></figure>
+<h3 id="format-拼接字符串"><a href="#format-拼接字符串" class="headerlink" title="format 拼接字符串"></a><code>format</code> 拼接字符串</h3><p>同样的，我们先看下面的第一组结果，是不是有点吃惊？第一组的第二结果不是unicode类型，而是str类型，这个跟<code>%</code>是不同的。很显然从结果上看，我们知道对于<code>format</code>其拼接结果类型取决于其格式化串的类型，而与参数没有任何关系。</p>
+<p>理解的第一组数据的规律后，再看第二组就知道为什么有的情况会报异常了。第二组的第二个结果，由于最终结果为str，pyhton解释器会默认用 ascii 对 <code>u&quot;中文&quot;</code> 进行编码，而第三个结果，由于最终结果为unicode，python解释器会默认用 ascii 对应 “中文” 进行解码，而报错的理由和前面的情况一致，都是因为ascii不认识非 0~127 编码。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">"&#123;&#125;"</span>.format(<span class="string">"hello"</span>))</span><br><span class="line">&lt;type <span class="string">'str'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">"&#123;&#125;"</span>.format(<span class="string">u"hello"</span>))</span><br><span class="line">&lt;type <span class="string">'str'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">u"&#123;&#125;"</span>.format(<span class="string">"hello"</span>))</span><br><span class="line">&lt;type <span class="string">'unicode'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">u"&#123;&#125;"</span>.format(<span class="string">u"hello"</span>))</span><br><span class="line">&lt;type <span class="string">'unicode'</span>&gt;</span><br><span class="line">&gt;&gt;&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">"&#123;&#125;"</span>.format(<span class="string">"中文"</span>))</span><br><span class="line">&lt;type <span class="string">'str'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">"&#123;&#125;"</span>.format(<span class="string">u"中文"</span>))         <span class="comment"># 最终结果为str，会隐式地通过ascii编码把u"中文"编码为ascii</span></span><br><span class="line">Traceback (most recent call last):</span><br><span class="line">  File <span class="string">"&lt;stdin&gt;"</span>, line <span class="number">1</span>, <span class="keyword">in</span> &lt;module&gt;</span><br><span class="line">UnicodeEncodeError: <span class="string">'ascii'</span> codec can<span class="string">'t encode characters in position 0-1: ordinal not in range(128)</span></span><br><span class="line"><span class="string">&gt;&gt;&gt; type("&#123;&#125;".format(u"中文".encode("utf-8")))</span></span><br><span class="line"><span class="string">&lt;type '</span>st<span class="string">r'&gt;</span></span><br><span class="line"><span class="string">&gt;&gt;&gt; type(u"&#123;&#125;".format("中文"))          # 最终结果为unicode，会隐式地通过ascii编码把"中文"解码为unicdoe</span></span><br><span class="line"><span class="string">Traceback (most recent call last):</span></span><br><span class="line"><span class="string">  File "&lt;stdin&gt;", line 1, in &lt;module&gt;</span></span><br><span class="line"><span class="string">UnicodeDecodeError: '</span>ascii<span class="string">' codec can'</span>t decode byte <span class="number">0xe4</span> <span class="keyword">in</span> position <span class="number">0</span>: ordinal <span class="keyword">not</span> <span class="keyword">in</span> range(<span class="number">128</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">u"&#123;&#125;"</span>.format(<span class="string">"中文"</span>.decode(<span class="string">"utf-8"</span>)))</span><br><span class="line">&lt;type <span class="string">'unicode'</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>type(<span class="string">u"&#123;&#125;"</span>.format(<span class="string">u"中文"</span>))</span><br><span class="line">&lt;type <span class="string">'unicode'</span>&gt;</span><br></pre></td></tr></table></figure>
+<h3 id="坑点"><a href="#坑点" class="headerlink" title="坑点"></a>坑点</h3><p>而我们线上的问题，要比以上两种都要隐蔽，大致如下：</p>
+<h4 id="代码目录结构"><a href="#代码目录结构" class="headerlink" title="代码目录结构"></a>代码目录结构</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"> tree -L 2 -I &quot;*.pyc&quot;</span><br><span class="line">.</span><br><span class="line">├── test_module_002</span><br><span class="line">│   ├── __init__.py</span><br><span class="line">│   ├── __pycache__</span><br><span class="line">│   ├── main.py</span><br><span class="line">│   └── module_a.py</span><br></pre></td></tr></table></figure>
+<a id="more"></a>
+<h4 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h4><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># module_a.py</span></span><br><span class="line"><span class="keyword">from</span> __future__ <span class="keyword">import</span> unicode_literals</span><br><span class="line"></span><br><span class="line">variable_a = <span class="string">"mytag"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># main.py</span></span><br><span class="line"><span class="comment"># -*- encoding=utf8 -*-</span></span><br><span class="line"><span class="keyword">import</span> six</span><br><span class="line"></span><br><span class="line"><span class="keyword">from</span> test_module_002 <span class="keyword">import</span> module_a</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> six.PY2:</span><br><span class="line">    variable_b = <span class="string">u"中文"</span>.encode(<span class="string">"utf-8"</span>)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    variable_b = <span class="string">u"中文"</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">"__main__"</span>:</span><br><span class="line">    print(<span class="string">"%s %s"</span> % (module_a.variable_a, variable_b))</span><br><span class="line">    print(<span class="string">"&#123;&#125; &#123;&#125;"</span>.format(module_a.variable_a, variable_b))</span><br><span class="line">    print(<span class="string">"%s %s"</span> % (module_a.variable_a.encode(<span class="string">"utf-8"</span>), variable_b))</span><br></pre></td></tr></table></figure>
+<h4 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h4><p>我们一开始使用的是 <code>%</code> 方式进行拼接字符串，会报类似以下的错误。当时就意识到可能是中文编码问题，于是就尝试使用format，没想到居然成功解决了，但是当时不知道具体原因是什么。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">print &quot;%s %s&quot; % (module_a.variable_a, variable_b)</span><br><span class="line">UnicodeDecodeError: &apos;ascii&apos; codec can&apos;t decode byte 0xe4 in position 0: ordinal not in range(128)</span><br></pre></td></tr></table></figure>
+<p>但是经过前面的分析，现在回过头来看还是比较清晰的，由于format最终类型为str，所以第二个variable_b不需要解码，只需要把variable_a进行编码就行了。哎？variable_a为什么是unicode，它前面没有u，不应该是str吗？这个也是一大坑点，在引用开源代码时需要注意其模块是否引入了 unicode_literals 特性，如果引入了那么定义的字符就默认为unicode了。</p>
+<p>可能有人会觉得，那我把variable_a用 utf-8 进行编码不就行了，这样不就只是两个str进行拼接吗？是的，这样在 <code>python2</code> 中的确可以，但是需要注意的是这样在 <code>python3</code> 中会加前缀b以及单引号，这样对一些匹配场景会有影响，如下结果所示。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">b&apos;mytag&apos; 中文</span><br></pre></td></tr></table></figure>
+<p>所以，如果要兼容python2和python3的话，最佳解决办法还是使用format。python2后两种均能正常显示，python3前两种均能正常显示。当然，也可以在print之前通过 six 进行判断，如：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> six.PY2:</span><br><span class="line">    print(<span class="string">"%s %s"</span> % (module_a.variable_a.encode(<span class="string">"utf-8"</span>), variable_b))</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    print(<span class="string">"%s %s"</span> % (module_a.variable_a, variable_b))</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>在编写代码时，从外面导入到系统的参数应该尽快转为unicode类型，在输出到外部时，应该转为str类型，这个也被称为 unicode sandwitch模型。</p>
+</blockquote>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>经过以上论述，我们知道了<code>%</code>和<code>format</code>的一些特性以及两者的异同点，分析了一个常见的坑点，并总结了在兼容python2和python3的场景下的方案。以下是本文要点：</p>
+<ul>
+<li>使用 <code>%</code> 进行拼接时，格式化串和字符串参数其中一个为unicode，最终结果就为unicode。</li>
+<li>使用 <code>format</code> 进行拼接时，拼接结果类型取决于其格式化串的类型。</li>
+<li>如果引入了unicode_literals特性，那么该模块定义的字符串均为unicode类型。</li>
+</ul>
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="https://stackoverflow.com/questions/21129020/how-to-fix-unicodedecodeerror-ascii-codec-cant-decode-byte" target="_blank" rel="noopener">How to fix: “UnicodeDecodeError: ‘ascii’ codec can’t decode byte”</a><br><a href="https://pyformat.info/#conversion_flags" target="_blank" rel="noopener">Using % and .format() for great good!</a><br><a href="https://nedbatchelder.com/text/unipain.html" target="_blank" rel="noopener">Pragmatic Unicode</a> ===&gt; 重点推荐这个视频<br><a href="https://stackoverflow.com/questions/9644099/python-ascii-codec-cant-decode-byte" target="_blank" rel="noopener">Python - ‘ascii’ codec can’t decode byte</a><br><a href="https://anonbadger.wordpress.com/2016/01/05/python2-string-format-and-unicode/" target="_blank" rel="noopener">Python2, string .format(), and unicode</a> ===&gt; 重点推荐这个文章  </p>
+
+      
+    </div>
+
+    
+
+    
+    
+    
+
+    
+
+    
+      
+    
+    
+
+    
+
+    <footer class="post-footer">
+      
+        
+          
+        
+        <div class="post-tags">
+          
+            <a href="/tags/python2/" rel="tag"># python2</a>
+          
+            <a href="/tags/python3/" rel="tag"># python3</a>
+          
+            <a href="/tags/编码/" rel="tag"># 编码</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/07/12/flink学习系列之一: taskmanager, slot与parallelism.html" rel="next" title="flink学习系列之一: taskmanager, slot与parallelism">
+                <i class="fa fa-chevron-left"></i> flink学习系列之一: taskmanager, slot与parallelism
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+  </div>
+
+
+          </div>
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">Long</p>
+              <div class="site-description motion-element" itemprop="description"></div>
+          </div>
+
+          
+            <nav class="site-state motion-element">
+              
+                <div class="site-state-item site-state-posts">
+                
+                  <a href="/archives/">
+                
+                    <span class="site-state-item-count">19</span>
+                    <span class="site-state-item-name">posts</span>
+                  </a>
+                </div>
+              
+
+              
+
+              
+                
+                
+                <div class="site-state-item site-state-tags">
+                  
+                    
+                      <a href="/tags/">
+                    
+                  
+                    
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                      
+                    
+                    <span class="site-state-item-count">14</span>
+                    <span class="site-state-item-name">tags</span>
+                  </a>
+                </div>
+              
+            </nav>
+          
+
+          
+
+          
+
+          
+            <div class="links-of-author motion-element">
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
+                </span>
+              
+                <span class="links-of-author-item">
+                  
+                  
+                    
+                  
+                  
+                    
+                  
+                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
+                </span>
+              
+            </div>
+          
+
+          
+
+          
+          
+
+          
+            
+          
+          
+
+        </div>
+      </div>
+
+      
+      <!--noindex-->
+        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+            
+            
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#基础知识"><span class="nav-number">1.</span> <span class="nav-text">基础知识</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#拼接字符串"><span class="nav-number">2.</span> <span class="nav-text">% 拼接字符串</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#format-拼接字符串"><span class="nav-number">3.</span> <span class="nav-text">format 拼接字符串</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#坑点"><span class="nav-number">4.</span> <span class="nav-text">坑点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#代码目录结构"><span class="nav-number">4.1.</span> <span class="nav-text">代码目录结构</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#代码"><span class="nav-number">4.2.</span> <span class="nav-text">代码</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#分析"><span class="nav-number">4.3.</span> <span class="nav-text">分析</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#总结"><span class="nav-number">5.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#参考"><span class="nav-number">6.</span> <span class="nav-text">参考</span></a></li></ol></div>
+            
+
+          </div>
+        </div>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+  
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
+  <span class="with-love" id="animate">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Long</span>
+
+  
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+    
+
+    
+  </div>
+
+  
+
+<script>
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+    
+    
+      
+    
+  
+  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script src="/lib/jquery/index.js?v=3.4.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+
+  
+
+
+  <script src="/js/utils.js?v=7.2.0"></script>
+
+  <script src="/js/motion.js?v=7.2.0"></script>
+
+
+
+  
+  
+
+
+  <script src="/js/affix.js?v=7.2.0"></script>
+
+  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
+
+
+
+
+  
+  <script src="/js/scrollspy.js?v=7.2.0"></script>
+<script src="/js/post-details.js?v=7.2.0"></script>
+
+
+
+  
+
+
+  <script src="/js/next-boot.js?v=7.2.0"></script>
+
+
+  
+
+  
+
+  
+
+  
+
+
+  
+
+
+  
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
