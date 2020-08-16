@@ -102,7 +102,7 @@
 <meta property="og:site_name" content="keep running">
 <meta property="og:description" content="如无特别说明，本文讨论的内容均基于 es 7.*  Term Aggregation的深度优先以及广度优先Term aggregation 是我们常用的聚合查询，对于有 父子聚合 的场景下，理解其执行父聚合以及子聚合的时机对我们优化聚合查询有很大的帮助，collect mode就指定了它们的执行时机，共有两种模式，一种是depth first，另一种是breadth first。 depth f">
 <meta property="og:locale" content="default">
-<meta property="og:updated_time" content="2020-08-16T14:20:35.519Z">
+<meta property="og:updated_time" content="2020-08-16T14:21:43.209Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="es学习系列之二：Aggregation collect mode and execution hint.md">
 <meta name="twitter:description" content="如无特别说明，本文讨论的内容均基于 es 7.*  Term Aggregation的深度优先以及广度优先Term aggregation 是我们常用的聚合查询，对于有 父子聚合 的场景下，理解其执行父聚合以及子聚合的时机对我们优化聚合查询有很大的帮助，collect mode就指定了它们的执行时机，共有两种模式，一种是depth first，另一种是breadth first。 depth f">
@@ -355,7 +355,7 @@
                 
               
 
-              <time title="Created: 2020-08-16 15:37:32 / Modified: 22:20:35" itemprop="dateCreated datePublished" datetime="2020-08-16T15:37:32+08:00">2020-08-16</time>
+              <time title="Created: 2020-08-16 15:37:32 / Modified: 22:21:43" itemprop="dateCreated datePublished" datetime="2020-08-16T15:37:32+08:00">2020-08-16</time>
             </span>
           
 
@@ -522,7 +522,7 @@
 <p>在冷数据的情况下，对大基数字段聚合时，global ordinal几乎都要比map模式要快。但是热数据情况下，map模式却不一定比global ordinal 模式快，因为map可能会耗损大量的内存。比如上面的热数据，在数据量接近8kw时，map反而比global ordinal更慢。</p>
 <p>global ordinal 和 map 并不是绝对的，往往跟数据的实际情况（基数大小、字段类型）紧密相关，需要根据实际情况进行调参。</p>
 <h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本文首先讨论了term aggregation的在父子聚合查询下collecto mode参数对聚合查询的影响，并分析了深度优先和广度优先的区别。还讨论了executrion hit对大基数字段聚合的影响，并总结了适用的场景。</p>
-<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/doc-values.html" target="_blank" rel="noopener">doc-values</a><br><a href="https://www.elastic.co/guide/en/elasticsearch/guide/current/_deep_dive_on_doc_values.html" target="_blank" rel="noopener">Deep Dive on Doc Values</a><br><a href="https://my.oschina.net/bingzhong/blog/1917915" target="_blank" rel="noopener">Elasticsearch聚合——Bucket Aggregations</a><br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/shard-request-cache.html" target="_blank" rel="noopener">Shard request cache</a><br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/eager-global-ordinals.html#_what_are_global_ordinals" target="_blank" rel="noopener">eager_global_ordinals</a><br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/tune-for-search-speed.html#tune-for-search-speed" target="_blank" rel="noopener">Tune for search speed</a><br><a href="https://elasticsearch.cn/question/1797" target="_blank" rel="noopener">Elasticsearch聚合操作的时间复杂度是O(n)吗？</a><br><a href="https://my.oschina.net/bingzhong/blog/1917915" target="_blank" rel="noopener">Elasticsearch聚合——Bucket Aggregations</a><br><a href="https://blog.csdn.net/zwgdft/article/details/83215977" target="_blank" rel="noopener">聚合查询越来越慢？——详解Elasticsearch的Global Ordinals与High Cardinality</a><br><a href="https://www.elastic.co/cn/blog/improving-the-performance-of-high-cardinality-terms-aggregations-in-elasticsearch" target="_blank" rel="noopener">Improving the performance of high-cardinality terms aggregations</a></p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/doc-values.html" target="_blank" rel="noopener">doc-values</a><br><a href="https://www.elastic.co/guide/en/elasticsearch/guide/current/_deep_dive_on_doc_values.html" target="_blank" rel="noopener">Deep Dive on Doc Values</a><br><a href="https://my.oschina.net/bingzhong/blog/1917915" target="_blank" rel="noopener">Elasticsearch聚合——Bucket Aggregations</a><br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/shard-request-cache.html" target="_blank" rel="noopener">Shard request cache</a><br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/eager-global-ordinals.html#_what_are_global_ordinals" target="_blank" rel="noopener">eager_global_ordinals</a><br><a href="https://www.elastic.co/guide/en/elasticsearch/reference/7.2/tune-for-search-speed.html#tune-for-search-speed" target="_blank" rel="noopener">Tune for search speed</a><br><a href="https://elasticsearch.cn/question/1797" target="_blank" rel="noopener">Elasticsearch聚合操作的时间复杂度是O(n)吗？</a><br><a href="https://blog.csdn.net/zwgdft/article/details/83215977" target="_blank" rel="noopener">聚合查询越来越慢？——详解Elasticsearch的Global Ordinals与High Cardinality</a><br><a href="https://www.elastic.co/cn/blog/improving-the-performance-of-high-cardinality-terms-aggregations-in-elasticsearch" target="_blank" rel="noopener">Improving the performance of high-cardinality terms aggregations</a></p>
 <blockquote>
 <p>本文为学习过程中产生的总结，由于学艺不精可能有些观点或者描述有误，还望各位同学帮忙指正，共同进步。</p>
 </blockquote>
