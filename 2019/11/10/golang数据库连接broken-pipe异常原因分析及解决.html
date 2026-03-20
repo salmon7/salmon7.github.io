@@ -1,132 +1,50 @@
 <!DOCTYPE html>
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
-
-<html class="theme-next gemini use-motion" lang>
-<head><meta name="generator" content="Hexo 3.9.0">
+<html lang="zh-CN">
+<head>
   <meta charset="UTF-8">
-<meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
-<meta name="theme-color" content="#222">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.1">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
 
 
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
 
+<script class="next-config" data-name="main" type="application/json">{"hostname":"blog.zhang7long.com","root":"/","images":"/images","scheme":"Muse","darkmode":true,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":false,"style":null},"fold":{"enable":false,"height":500},"language":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css?v=4.7.0">
-
-<link rel="stylesheet" href="/css/main.css?v=7.2.0">
-
-
-  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=7.2.0">
-
-
-  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=7.2.0">
-
-
-  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=7.2.0">
-
-
-  <link rel="mask-icon" href="/images/logo.svg?v=7.2.0" color="#222">
-
-
-
-
-
-
-
-<script id="hexo.configurations">
-  var NexT = window.NexT || {};
-  var CONFIG = {
-    root: '/',
-    scheme: 'Gemini',
-    version: '7.2.0',
-    sidebar: {"position":"left","display":"post","offset":12,"onmobile":false,"dimmer":false},
-    back2top: true,
-    back2top_sidebar: false,
-    fancybox: false,
-    fastclick: false,
-    lazyload: false,
-    tabs: true,
-    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
-    algolia: {
-      applicationID: '',
-      apiKey: '',
-      indexName: '',
-      hits: {"per_page":10},
-      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
-    }
-  };
-</script>
-
-
-  
-
-
-
-
-  <meta name="description" content="在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver/mysql，该包是按照go官方包database/sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。  线上场景目前 项目A 使用的go-sql-driver/mysql版本为 3654d25ec346ee8ce71a684">
-<meta name="keywords" content="go,mysql">
+    <meta name="description" content="在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver&#x2F;mysql，该包是按照go官方包database&#x2F;sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。  线上场景目前 项目A 使用的go-sql-driver&#x2F;mysql版本为 3654d25e">
 <meta property="og:type" content="article">
 <meta property="og:title" content="golang数据库连接broken pipe异常原因分析及解决">
-<meta property="og:url" content="http://blog.zhang7long.com/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决.html">
+<meta property="og:url" content="http://blog.zhang7long.com/2019/11/10/golang%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5broken-pipe%E5%BC%82%E5%B8%B8%E5%8E%9F%E5%9B%A0%E5%88%86%E6%9E%90%E5%8F%8A%E8%A7%A3%E5%86%B3.html">
 <meta property="og:site_name" content="keep running">
-<meta property="og:description" content="在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver/mysql，该包是按照go官方包database/sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。  线上场景目前 项目A 使用的go-sql-driver/mysql版本为 3654d25ec346ee8ce71a684">
-<meta property="og:locale" content="default">
-<meta property="og:image" content="http://blog.zhang7long.com/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决/tcpdump1.png">
-<meta property="og:image" content="http://blog.zhang7long.com/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决/tcpdump2.png">
-<meta property="og:updated_time" content="2020-05-17T06:32:49.290Z">
+<meta property="og:description" content="在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver&#x2F;mysql，该包是按照go官方包database&#x2F;sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。  线上场景目前 项目A 使用的go-sql-driver&#x2F;mysql版本为 3654d25e">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://blog.zhang7long.com/img/tcpdump1.png">
+<meta property="og:image" content="http://blog.zhang7long.com/img/tcpdump2.png">
+<meta property="article:published_time" content="2019-11-10T13:57:03.000Z">
+<meta property="article:modified_time" content="2026-03-20T08:37:52.799Z">
+<meta property="article:author" content="Long">
+<meta property="article:tag" content="go">
+<meta property="article:tag" content="mysql">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="golang数据库连接broken pipe异常原因分析及解决">
-<meta name="twitter:description" content="在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver/mysql，该包是按照go官方包database/sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。  线上场景目前 项目A 使用的go-sql-driver/mysql版本为 3654d25ec346ee8ce71a684">
-<meta name="twitter:image" content="http://blog.zhang7long.com/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决/tcpdump1.png">
+<meta name="twitter:image" content="http://blog.zhang7long.com/img/tcpdump1.png">
 
 
+<link rel="canonical" href="http://blog.zhang7long.com/2019/11/10/golang%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5broken-pipe%E5%BC%82%E5%B8%B8%E5%8E%9F%E5%9B%A0%E5%88%86%E6%9E%90%E5%8F%8A%E8%A7%A3%E5%86%B3.html">
 
 
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://blog.zhang7long.com/2019/11/10/golang%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5broken-pipe%E5%BC%82%E5%B8%B8%E5%8E%9F%E5%9B%A0%E5%88%86%E6%9E%90%E5%8F%8A%E8%A7%A3%E5%86%B3.html","path":"2019/11/10/golang数据库连接broken-pipe异常原因分析及解决.html","title":"golang数据库连接broken pipe异常原因分析及解决"}</script>
 
-  
-  
-  <link rel="canonical" href="http://blog.zhang7long.com/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决">
-
-
-
-<script id="page.configurations">
-  CONFIG.page = {
-    sidebar: "",
-  };
-</script>
-
-  <title>golang数据库连接broken pipe异常原因分析及解决 | keep running</title>
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>golang数据库连接broken pipe异常原因分析及解决 | keep running</title>
   
 
 
@@ -134,289 +52,183 @@
 
 
 
-  <script>
-    var _hmt = _hmt || [];
-    (function() {
-      var hm = document.createElement("script");
-      hm.src = "https://hm.baidu.com/hm.js?c81c2d859c047c5b20dc74f1bd5eb198";
-      var s = document.getElementsByTagName("script")[0];
-      s.parentNode.insertBefore(hm, s);
-    })();
-  </script>
 
 
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
 
 
 
 
 
   <noscript>
-  <style>
-  .use-motion .motion-element,
-  .use-motion .brand,
-  .use-motion .menu-item,
-  .sidebar-inner,
-  .use-motion .post-block,
-  .use-motion .pagination,
-  .use-motion .comments,
-  .use-motion .post-header,
-  .use-motion .post-body,
-  .use-motion .collection-title { opacity: initial; }
-
-  .use-motion .logo,
-  .use-motion .site-title,
-  .use-motion .site-subtitle {
-    opacity: initial;
-    top: initial;
-  }
-
-  .use-motion .logo-line-before i { left: initial; }
-  .use-motion .logo-line-after i { right: initial; }
-  </style>
-</noscript>
-
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
 </head>
 
-<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
 
-  
-  
-    
-  
-
-  <div class="container sidebar-position-left page-post-detail">
-    <div class="headband"></div>
-
-    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
-      <div class="header-inner"><div class="site-brand-wrapper">
-  <div class="site-meta">
-    
-
-    <div class="custom-logo-site-title">
-      <a href="/" class="brand" rel="start">
-        <span class="logo-line-before"><i></i></span>
-        <span class="site-title">keep running</span>
-        <span class="logo-line-after"><i></i></span>
-      </a>
-    </div>
-    
-    
-  </div>
-
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
   <div class="site-nav-toggle">
-    <button aria-label="Toggle navigation bar">
-      <span class="btn-bar"></span>
-      <span class="btn-bar"></span>
-      <span class="btn-bar"></span>
-    </button>
+    <div class="toggle" aria-label="切换导航栏" role="button">
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">keep running</p>
+      <i class="logo-line"></i>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
   </div>
 </div>
 
 
 
-<nav class="site-nav">
+
+
+
+
+</header>
+        
   
-    <ul id="menu" class="menu">
-      
-        
-        
-        
-          
-          <li class="menu-item menu-item-home">
+  <aside class="sidebar">
 
-    
-    
-      
-    
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
 
-    
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%BF%E4%B8%8A%E5%9C%BA%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">线上场景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%97%AE%E9%A2%98%E5%A4%8D%E7%8E%B0"><span class="nav-number">2.</span> <span class="nav-text">问题复现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E8%AE%BE%E7%BD%AEmysql-server%E4%B8%BB%E5%8A%A8%E5%85%B3%E9%97%AD%E8%BF%9E%E6%8E%A5%E6%97%B6%E9%97%B4"><span class="nav-number">2.1.</span> <span class="nav-text">1.设置mysql server主动关闭连接时间</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E8%BF%90%E8%A1%8Ctcpdump%E5%92%8C%E6%B5%8B%E8%AF%95demo"><span class="nav-number">2.2.</span> <span class="nav-text">2.运行tcpdump和测试demo</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E5%88%86%E6%9E%90tcp%E6%95%B0%E6%8D%AE%E5%8C%85"><span class="nav-number">2.3.</span> <span class="nav-text">3.分析tcp数据包</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">2.4.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#mysql-server%E8%BF%9E%E6%8E%A5%E5%92%8Cgolang%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5%E6%B1%A0%E7%9A%84%E5%A4%8D%E7%94%A8%E6%97%B6%E9%97%B4"><span class="nav-number">3.</span> <span class="nav-text">mysql server连接和golang数据库连接池的复用时间</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-mysql%E8%BF%9E%E6%8E%A5%E5%A4%8D%E7%94%A8%E6%97%B6%E9%97%B4"><span class="nav-number">3.1.</span> <span class="nav-text">1.mysql连接复用时间</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-golang%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5%E6%B1%A0%E5%A4%8D%E7%94%A8%E6%97%B6%E9%97%B4"><span class="nav-number">3.2.</span> <span class="nav-text">2.golang数据库连接池复用时间</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E5%AF%B9%E4%B8%9A%E5%8A%A1%E7%9A%84%E5%BD%B1%E5%93%8D"><span class="nav-number">3.3.</span> <span class="nav-text">3.对业务的影响</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">4.</span> <span class="nav-text">解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%E4%B8%80%EF%BC%9A%E6%9B%B4%E6%96%B0mysql%E9%A9%B1%E5%8A%A8%E5%88%B0%E7%9B%AE%E5%89%8D%E6%9C%80%E6%96%B0release%E7%89%88%E6%9C%AC-v1-4-1"><span class="nav-number">4.1.</span> <span class="nav-text">解决方案一：更新mysql驱动到目前最新release版本-v1.4.1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%E4%BA%8C%EF%BC%9A%E6%9B%B4%E6%96%B0mysql%E9%A9%B1%E5%8A%A8%E5%88%B0%E6%9C%80%E6%96%B0%E7%9A%84master"><span class="nav-number">4.2.</span> <span class="nav-text">解决方案二：更新mysql驱动到最新的master</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%E4%B8%89%EF%BC%9A%E4%B8%8D%E5%8D%87%E7%BA%A7mysql%E9%A9%B1%E5%8A%A8%E7%89%88%E6%9C%AC"><span class="nav-number">4.3.</span> <span class="nav-text">解决方案三：不升级mysql驱动版本</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">5.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E9%93%BE%E6%8E%A5"><span class="nav-number">6.</span> <span class="nav-text">参考链接</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
 
-    <a href="/" rel="section"><i class="menu-item-icon fa fa-fw fa-home"></i> <br>Home</a>
-
-  </li>
-        
-        
-        
-          
-          <li class="menu-item menu-item-tags">
-
-    
-    
-      
-    
-
-    
-
-    <a href="/tags/" rel="section"><i class="menu-item-icon fa fa-fw fa-tags"></i> <br>Tags</a>
-
-  </li>
-        
-        
-        
-          
-          <li class="menu-item menu-item-archives">
-
-    
-    
-      
-    
-
-    
-
-    <a href="/archives/" rel="section"><i class="menu-item-icon fa fa-fw fa-archive"></i> <br>Archives</a>
-
-  </li>
-
-      
-      
-    </ul>
-  
-
-  
-
-  
-</nav>
-
-
-
-  
-
-
-
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Long</p>
+  <div class="site-description" itemprop="description"></div>
 </div>
-    </header>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">19</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
 
     
+  </aside>
 
 
-    <main id="main" class="main">
-      <div class="main-inner">
-        <div class="content-wrap">
-          
-            
+    </div>
 
-          
-          <div id="content" class="content">
-            
+    <div class="main-inner post posts-expand">
 
-  <div id="posts" class="posts-expand">
-    
 
   
 
-  
+
+<div class="post-block">
   
   
 
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决.html">
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://blog.zhang7long.com/2019/11/10/golang%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5broken-pipe%E5%BC%82%E5%B8%B8%E5%8E%9F%E5%9B%A0%E5%88%86%E6%9E%90%E5%8F%8A%E8%A7%A3%E5%86%B3.html">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="Long">
-      <meta itemprop="description" content>
       <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Long">
     </span>
 
     <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
       <meta itemprop="name" content="keep running">
+      <meta itemprop="description" content="">
     </span>
 
-    
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="golang数据库连接broken pipe异常原因分析及解决 | keep running">
+      <meta itemprop="description" content="">
+    </span>
       <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          golang数据库连接broken pipe异常原因分析及解决
+        </h1>
 
-        
-        
-          <h1 class="post-title" itemprop="name headline">golang数据库连接broken pipe异常原因分析及解决
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
 
-              
-            
-          </h1>
-        
+      <time title="创建时间：2019-11-10 21:57:03" itemprop="dateCreated datePublished" datetime="2019-11-10T21:57:03+08:00">2019-11-10</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-03-20 16:37:52" itemprop="dateModified" datetime="2026-03-20T16:37:52+08:00">2026-03-20</time>
+    </span>
 
-        <div class="post-meta">
-
-          
-          
-          
-
-          
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-
-              
-                
-              
-
-              <time title="Created: 2019-11-10 21:57:03" itemprop="dateCreated datePublished" datetime="2019-11-10T21:57:03+08:00">2019-11-10</time>
-            </span>
-          
-
-          
-            
-
-            
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                
-                  <span class="post-meta-item-text">Edited on</span>
-                
-                <time title="Modified: 2020-05-17 14:32:49" itemprop="dateModified" datetime="2020-05-17T14:32:49+08:00">2020-05-17</time>
-              </span>
-            
-          
-
-          
-
-          
-            
-            
-          
-
-          
-          
-
-          
-
-          <br>
-          
-
-          
-
-          
+  
+</div>
 
         </div>
       </header>
-    
 
     
     
     
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        <blockquote>
-<p>在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver/mysql，该包是按照go官方包database/sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。</p>
+    <div class="post-body" itemprop="articleBody"><blockquote>
+<p>在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver&#x2F;mysql，该包是按照go官方包database&#x2F;sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。</p>
 </blockquote>
-<h2 id="线上场景"><a href="#线上场景" class="headerlink" title="线上场景"></a>线上场景</h2><p>目前 <strong>项目A</strong> 使用的go-sql-driver/mysql版本为 <strong>3654d25ec346ee8ce71a68431025458d52a38ac0</strong> ， <strong>项目B</strong> 使用的版本为 <strong>v1.3.0</strong> ，其中 <strong>项目A</strong> 的版本低于v1.3.0。它们线上标准错误输出都有类似以下的日志，但是程序的业务逻辑却没有影响。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[mysql] 2019/08/01 17:12:18 packets.go:33: unexpected EOF</span><br><span class="line">[mysql] 2019/08/01 17:12:18 packets.go:130: write tcp 127.0.0.1:59722-&gt;127.0.0.1:3306: write: broken pipe</span><br></pre></td></tr></table></figure>
+<h2 id="线上场景"><a href="#线上场景" class="headerlink" title="线上场景"></a>线上场景</h2><p>目前 <strong>项目A</strong> 使用的go-sql-driver&#x2F;mysql版本为 <strong>3654d25ec346ee8ce71a68431025458d52a38ac0</strong> ， <strong>项目B</strong> 使用的版本为 <strong>v1.3.0</strong> ，其中 <strong>项目A</strong> 的版本低于v1.3.0。它们线上标准错误输出都有类似以下的日志，但是程序的业务逻辑却没有影响。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[mysql] 2019/08/01 17:12:18 packets.go:33: unexpected EOF</span><br><span class="line">[mysql] 2019/08/01 17:12:18 packets.go:130: write tcp 127.0.0.1:59722-&gt;127.0.0.1:3306: write: broken pipe</span><br></pre></td></tr></table></figure>
+
 <p>通过日志输出以及堆栈可以找到 <code>go-sql-driver/mysql/packets.go</code> 对应的源码，可以发现第一条日志是以下第8行代码打印，第二条是第9行调用<code>mc.Close()</code>关闭连接时报错。</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Read packet to buffer 'data'</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(mc *mysqlConn)</span> <span class="title">readPacket</span><span class="params">()</span> <span class="params">([]<span class="keyword">byte</span>, error)</span></span> &#123;</span><br><span class="line">    <span class="keyword">var</span> prevData []<span class="keyword">byte</span></span><br><span class="line">    <span class="keyword">for</span> &#123;</span><br><span class="line">        <span class="comment">// read packet header</span></span><br><span class="line">        data, err := mc.buf.readNext(<span class="number">4</span>)</span><br><span class="line">        <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">            errLog.Print(err)</span><br><span class="line">            mc.Close()</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">nil</span>, driver.ErrBadConn</span><br><span class="line">        &#125;</span><br><span class="line">     <span class="comment">// 省略部分代码</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Read packet to buffer &#x27;data&#x27;</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(mc *mysqlConn)</span></span> readPacket() ([]<span class="type">byte</span>, <span class="type">error</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> prevData []<span class="type">byte</span></span><br><span class="line">    <span class="keyword">for</span> &#123;</span><br><span class="line">        <span class="comment">// read packet header</span></span><br><span class="line">        data, err := mc.buf.readNext(<span class="number">4</span>)</span><br><span class="line">        <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">            errLog.Print(err)</span><br><span class="line">            mc.Close()</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">nil</span>, driver.ErrBadConn</span><br><span class="line">        &#125;</span><br><span class="line">     <span class="comment">// 省略部分代码</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
 <h2 id="问题复现"><a href="#问题复现" class="headerlink" title="问题复现"></a>问题复现</h2><blockquote>
 <p>通过网上搜索能够大概猜出是mysql server主动关闭的原因，我们可以通过设置mysql server主动关闭连接来复现线上场景，并且通过tcpdump观察其原因。</p>
 </blockquote>
@@ -424,35 +236,42 @@
 <h3 id="2-运行tcpdump和测试demo"><a href="#2-运行tcpdump和测试demo" class="headerlink" title="2.运行tcpdump和测试demo"></a>2.运行tcpdump和测试demo</h3><p>1.通过tcpdump可以收集tcp数据包的发送接收情况，尤其是的在mysql server关闭连接后，go程序如何和mysql server交互是我们关注的重点，tcpdump命令如下：</p>
 <p><code>sudo tcpdump -s 0 -t -i lo -l port 3306 -w lo.cap</code></p>
 <p>2.运行一个简单的测试demo</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">"database/sql"</span></span><br><span class="line">    <span class="string">"log"</span></span><br><span class="line">    <span class="string">"time"</span></span><br><span class="line">    _ <span class="string">"github.com/go-sql-driver/mysql"</span></span><br><span class="line">)</span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="comment">// before you run this test program, please run the script in your mysql</span></span><br><span class="line">    <span class="comment">// "set global wait_timeout=10;"</span></span><br><span class="line">    <span class="comment">// 表示mysql server关闭不活跃连接的等待时间</span></span><br><span class="line">    <span class="comment">// 参考 https://github.com/go-sql-driver/mysql/issues/657</span></span><br><span class="line">    db, err := sql.Open(<span class="string">"mysql"</span>, <span class="string">"root:zhang@tcp(127.0.0.1:3306)/?charset=latin1&amp;autocommit=1&amp;parseTime=true&amp;loc=Local&amp;timeout=3s"</span>)</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        log.Fatal(err)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">defer</span> db.Close()</span><br><span class="line">    <span class="comment">//db.SetConnMaxLifetime(5 * time.Second)</span></span><br><span class="line">    err = db.Ping()</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        log.Fatal(err)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">for</span> &#123;</span><br><span class="line">            _, err := db.Exec(<span class="string">"select * from test_time.A"</span>)</span><br><span class="line">            <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">                log.Fatal(err)</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// Wait for 11 seconds. This should be enough to timeout the conn, since `wait_timeout` is 10s</span></span><br><span class="line">            time.Sleep(<span class="number">11</span> * time.Second)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;()</span><br><span class="line">    time.Sleep(<span class="number">1000</span> * time.Second)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<a id="more"></a>
-<h3 id="3-分析tcp数据包"><a href="#3-分析tcp数据包" class="headerlink" title="3.分析tcp数据包"></a>3.分析tcp数据包</h3><p>通过wireshark打开lo.cap文件可以更加直观观察其交互情况，截图如下二图：<br><img src="/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决/tcpdump1.png" alt="tcpdump1"><br><img src="/2019/11/10/golang数据库连接broken-pipe异常原因分析及解决/tcpdump2.png" alt="tcpdump2"></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">    <span class="string">&quot;database/sql&quot;</span></span><br><span class="line">    <span class="string">&quot;log&quot;</span></span><br><span class="line">    <span class="string">&quot;time&quot;</span></span><br><span class="line">    _ <span class="string">&quot;github.com/go-sql-driver/mysql&quot;</span></span><br><span class="line">)</span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">    <span class="comment">// before you run this test program, please run the script in your mysql</span></span><br><span class="line">    <span class="comment">// &quot;set global wait_timeout=10;&quot;</span></span><br><span class="line">    <span class="comment">// 表示mysql server关闭不活跃连接的等待时间</span></span><br><span class="line">    <span class="comment">// 参考 https://github.com/go-sql-driver/mysql/issues/657</span></span><br><span class="line">    db, err := sql.Open(<span class="string">&quot;mysql&quot;</span>, <span class="string">&quot;root:zhang@tcp(127.0.0.1:3306)/?charset=latin1&amp;autocommit=1&amp;parseTime=true&amp;loc=Local&amp;timeout=3s&quot;</span>)</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        log.Fatal(err)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">defer</span> db.Close()</span><br><span class="line">    <span class="comment">//db.SetConnMaxLifetime(5 * time.Second)</span></span><br><span class="line">    err = db.Ping()</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">        log.Fatal(err)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">go</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">for</span> &#123;</span><br><span class="line">            _, err := db.Exec(<span class="string">&quot;select * from test_time.A&quot;</span>)</span><br><span class="line">            <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">                log.Fatal(err)</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// Wait for 11 seconds. This should be enough to timeout the conn, since `wait_timeout` is 10s</span></span><br><span class="line">            time.Sleep(<span class="number">11</span> * time.Second)</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;()</span><br><span class="line">    time.Sleep(<span class="number">1000</span> * time.Second)</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<span id="more"></span>
+
+<h3 id="3-分析tcp数据包"><a href="#3-分析tcp数据包" class="headerlink" title="3.分析tcp数据包"></a>3.分析tcp数据包</h3><p>通过wireshark打开lo.cap文件可以更加直观观察其交互情况，截图如下二图：<br><img src="/./img/tcpdump1.png" alt="tcpdump1"><br><img src="/./img/tcpdump2.png" alt="tcpdump2"></p>
 <p>可以看到10秒的第222号数据包中，mysql server发送的FIN信号并且收到了golang程序第223号的ack后，进入到tcp连接中FIN_WAIT_2状态，golang程序则进入到CLOSE_WAIT状态，此时mysql server不再接受任何查询请求。同时由于golang程序应用层无法感知mysql server关闭了连接，在11秒第224号的数据包中依然向mysql server发送了查询请求，mysql server应用层发现错误，直接返回重置连接。应用程序也打印出对应的日志。</p>
 <h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>通过复现和分析，可知根本原因是golang尝试去使用一个被mysql server主动关闭的连接。通过代码堆栈分析，还分析出<code>unexpected EOF</code>是发送查询给mysql server后读取返回结果报错，而<code>write tcp 127.0.0.1:59722-&gt;127.0.0.1:3306: write: broken pipe</code>则是读取结果报错后尝试关闭连接时失败的报错。</p>
 <h2 id="mysql-server连接和golang数据库连接池的复用时间"><a href="#mysql-server连接和golang数据库连接池的复用时间" class="headerlink" title="mysql server连接和golang数据库连接池的复用时间"></a>mysql server连接和golang数据库连接池的复用时间</h2><blockquote>
 <p>通过上一节，基本能确定是mysql server主动关闭连接的原因导致的，那么mysql server的 <code>wait_timeout</code>具体的定义和golang怎么解决这种问题的？对我们的业务有无影响？</p>
 </blockquote>
 <h3 id="1-mysql连接复用时间"><a href="#1-mysql连接复用时间" class="headerlink" title="1.mysql连接复用时间"></a>1.mysql连接复用时间</h3><p>mysql server在一定时间后将自动关闭不活跃连接。这个时间由<code>wait_timeout</code>决定，表示mysql server关闭 <strong>不活跃</strong> 连接的等待时间。<code>wait_timeout</code>配置官方说明如下。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">wait_timeout: </span><br><span class="line">The number of seconds the server waits for </span><br><span class="line">activity on a noninteractive connection before closing it.</span><br><span class="line"></span><br><span class="line">https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_wait_timeout</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">wait_timeout: </span><br><span class="line">The number of seconds the server waits for </span><br><span class="line">activity on a noninteractive connection before closing it.</span><br><span class="line"></span><br><span class="line">https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_wait_timeout</span><br></pre></td></tr></table></figure>
+
 <h3 id="2-golang数据库连接池复用时间"><a href="#2-golang数据库连接池复用时间" class="headerlink" title="2.golang数据库连接池复用时间"></a>2.golang数据库连接池复用时间</h3><p>go的默认连接池不会自动关闭连接，除非通过 <code>DB.SetConnMaxLifetime()</code> 设置了连接最长的时间，一般建议该配置远小于mysql server的<code>wait_timeout</code>。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">// SetConnMaxLifetime sets the maximum amount </span><br><span class="line">// of time a connection may be reused.</span><br><span class="line">//</span><br><span class="line">// Expired connections may be closed lazily before reuse.</span><br><span class="line">//</span><br><span class="line">// If d &lt;= 0, connections are reused forever.</span><br><span class="line">func (db *DB) SetConnMaxLifetime(d time.Duration)</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">// SetConnMaxLifetime sets the maximum amount </span><br><span class="line">// of time a connection may be reused.</span><br><span class="line">//</span><br><span class="line">// Expired connections may be closed lazily before reuse.</span><br><span class="line">//</span><br><span class="line">// If d &lt;= 0, connections are reused forever.</span><br><span class="line">func (db *DB) SetConnMaxLifetime(d time.Duration)</span><br></pre></td></tr></table></figure>
+
 <p>如果某个连接已经被mysql server关闭，而go程序无法感知，在复用该数据库连接时则会输出上述的错误日志。目前 <strong>项目A</strong> 和 <strong>项目B</strong> 的mysql驱动版本将这种错误情况返回 <code>driver.ErrBadConn</code>。</p>
 <h3 id="3-对业务的影响"><a href="#3-对业务的影响" class="headerlink" title="3.对业务的影响"></a>3.对业务的影响</h3><blockquote>
 <p>这种mysql server主动关闭连接的情况，对我们的业务有没影响？</p>
 </blockquote>
 <p>go的官方 <code>database/sql</code> 包会对返回 <code>driver.ErrBadConn</code> 的错误进行重试，这点可以通过看源码 <code>database/sql/sql.go</code> 验证。可以看到只要驱动包返回了<code>drvier.ErrBadConn</code>，那么就会进行重试2次。因此如果第一次执行失败了，那么还会进行重试，所以最终对业务不会有影响，只是标准错误输出有对应的日志输出。</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// maxBadConnRetries is the number of maximum retries if the driver returns</span></span><br><span class="line"><span class="comment">// driver.ErrBadConn to signal a broken connection before forcing a new</span></span><br><span class="line"><span class="comment">// connection to be opened.</span></span><br><span class="line"><span class="keyword">const</span> maxBadConnRetries = <span class="number">2</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// ExecContext executes a query without returning any rows.</span></span><br><span class="line"><span class="comment">// The args are for any placeholder parameters in the query.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(db *DB)</span> <span class="title">ExecContext</span><span class="params">(ctx context.Context, query <span class="keyword">string</span>, args ...<span class="keyword">interface</span>&#123;&#125;)</span> <span class="params">(Result, error)</span></span> &#123;</span><br><span class="line">    <span class="keyword">var</span> res Result</span><br><span class="line">    <span class="keyword">var</span> err error</span><br><span class="line">    <span class="keyword">for</span> i := <span class="number">0</span>; i &lt; maxBadConnRetries; i++ &#123;</span><br><span class="line">        res, err = db.exec(ctx, query, args, cachedOrNewConn)</span><br><span class="line">        <span class="keyword">if</span> err != driver.ErrBadConn &#123;</span><br><span class="line">            <span class="keyword">break</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> err == driver.ErrBadConn &#123;</span><br><span class="line">        <span class="keyword">return</span> db.exec(ctx, query, args, alwaysNewConn)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> res, err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// maxBadConnRetries is the number of maximum retries if the driver returns</span></span><br><span class="line"><span class="comment">// driver.ErrBadConn to signal a broken connection before forcing a new</span></span><br><span class="line"><span class="comment">// connection to be opened.</span></span><br><span class="line"><span class="keyword">const</span> maxBadConnRetries = <span class="number">2</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// ExecContext executes a query without returning any rows.</span></span><br><span class="line"><span class="comment">// The args are for any placeholder parameters in the query.</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(db *DB)</span></span> ExecContext(ctx context.Context, query <span class="type">string</span>, args ...<span class="keyword">interface</span>&#123;&#125;) (Result, <span class="type">error</span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> res Result</span><br><span class="line">    <span class="keyword">var</span> err <span class="type">error</span></span><br><span class="line">    <span class="keyword">for</span> i := <span class="number">0</span>; i &lt; maxBadConnRetries; i++ &#123;</span><br><span class="line">        res, err = db.exec(ctx, query, args, cachedOrNewConn)</span><br><span class="line">        <span class="keyword">if</span> err != driver.ErrBadConn &#123;</span><br><span class="line">            <span class="keyword">break</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> err == driver.ErrBadConn &#123;</span><br><span class="line">        <span class="keyword">return</span> db.exec(ctx, query, args, alwaysNewConn)</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> res, err</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
 <h2 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h2><blockquote>
 <p>测试demo见问题复现章节</p>
 </blockquote>
-<h3 id="解决方案一：更新mysql驱动到目前最新release版本-v1-4-1"><a href="#解决方案一：更新mysql驱动到目前最新release版本-v1-4-1" class="headerlink" title="解决方案一：更新mysql驱动到目前最新release版本-v1.4.1"></a>解决方案一：更新mysql驱动到目前最新release版本-v1.4.1</h3><p>目前最新release的版本v1.4.1包含了修改以前 <strong>激进重试策略</strong> 的提交（代码修改逻辑见 <a href="https://github.com/go-sql-driver/mysql/commit/26471af196a17ee75a22e6481b5a5897fb16b081" target="_blank" rel="noopener">commit</a>），将 <strong>许多</strong> 情况下从返回 <code>driver.ErrBadConn</code> 改为返回 <code>ErrInvalidConn</code>，减少滥用官方sql包的重试逻辑。本章讨论的mysql server主动关闭连接也在此次修改中。</p>
+<h3 id="解决方案一：更新mysql驱动到目前最新release版本-v1-4-1"><a href="#解决方案一：更新mysql驱动到目前最新release版本-v1-4-1" class="headerlink" title="解决方案一：更新mysql驱动到目前最新release版本-v1.4.1"></a>解决方案一：更新mysql驱动到目前最新release版本-v1.4.1</h3><p>目前最新release的版本v1.4.1包含了修改以前 <strong>激进重试策略</strong> 的提交（代码修改逻辑见 <a href="https://github.com/go-sql-driver/mysql/commit/26471af196a17ee75a22e6481b5a5897fb16b081">commit</a>），将 <strong>许多</strong> 情况下从返回 <code>driver.ErrBadConn</code> 改为返回 <code>ErrInvalidConn</code>，减少滥用官方sql包的重试逻辑。本章讨论的mysql server主动关闭连接也在此次修改中。</p>
 <p>跟踪源代码调用栈发现，由于连接为非阻塞socket，在mysql server关闭连接后，<code>go-sql-driver/mysql</code>还能继续write数据到socket的buffer中，并且不会立即返回错误。在<code>go-sql-driver/mysql</code>读取返回值时才从系统内核socket读取mysql server返回的错误，此时<code>go-sql-driver/mysql</code>知道mysql server返回错误了。这个时候有两个策略：</p>
 <ul>
 <li>一是返回driver.ErrBadConn，在官方<code>go-sql-driver/mysql</code>包进行重试，release版本-v1.3.0使用这种策略。</li>
 <li>二是返回db error，因为从mysql应用层面来说，它认为已经发送sql成功，只是读取的时候返回错误了，这个时候它不需要重试逻辑，<strong>避免sql被重复执行</strong>。目前release版本-v1.4.0和v1.4.1就是这种策略。</li>
 </ul>
 <p>使用release版本-v1.4.1，经测试mysql server关闭连接后，再执行sql会输出以下日志，其中第一行为<code>go-sql-driver/mysql</code>包的标准错误输出，第二行和第三行是程序逻辑的日志输出，执行sql时返回db error，官方sql包没有进行重试。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[mysql] 2019/08/01 17:09:41 packets.go:36: unexpected EOF</span><br><span class="line">2019/08/01 17:09:41 invalid connection</span><br><span class="line">exit status 1</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[mysql] 2019/08/01 17:09:41 packets.go:36: unexpected EOF</span><br><span class="line">2019/08/01 17:09:41 invalid connection</span><br><span class="line">exit status 1</span><br></pre></td></tr></table></figure>
+
 <p>小结：</p>
 <ul>
 <li><p>优点：</p>
@@ -475,23 +294,27 @@
 <li>能否在使用连接前确认连接是否被关闭。如果已经被关闭或者有异常数据，则返回<code>driver.ErrBadConn</code>便于<code>database/sql</code>进行重试；如果没有关闭，则复用该连接。</li>
 <li>通过某种机制避免重复执行sql。</li>
 </ul>
-<p>为此vicent提出了<a href="https://github.com/go-sql-driver/mysql/pull/934" target="_blank" rel="noopener">mr</a> ，目前已经被merge到<a href="https://github.com/go-sql-driver/mysql/commit/bc5e6eaa6d4fc8a7c8668050c7b1813afeafcabe" target="_blank" rel="noopener">master</a>中，但是未发布release版本，目前还在不断的优化中。简单描述一下vicent的修改要点：</p>
+<p>为此vicent提出了<a href="https://github.com/go-sql-driver/mysql/pull/934">mr</a> ，目前已经被merge到<a href="https://github.com/go-sql-driver/mysql/commit/bc5e6eaa6d4fc8a7c8668050c7b1813afeafcabe">master</a>中，但是未发布release版本，目前还在不断的优化中。简单描述一下vicent的修改要点：</p>
 <ul>
-<li>从pool刚拿出的连接均为不活跃的连接。</li>
-<li>刚从pool拿出的连接，如果直接从socket读取一个字节的内容，那么一定不会从mysql服务端收到信息，因为该连接原先是不活跃连接，与mysql server没有实际的数据交换，仅仅是保持连接。如果能读到数据则表示连接有异常，返回<code>driver.ErrBadConn</code>便于<code>database/sql</code>进行重试。</li>
+<li><p>从pool刚拿出的连接均为不活跃的连接。</p>
+</li>
+<li><p>刚从pool拿出的连接，如果直接从socket读取一个字节的内容，那么一定不会从mysql服务端收到信息，因为该连接原先是不活跃连接，与mysql server没有实际的数据交换，仅仅是保持连接。如果能读到数据则表示连接有异常，返回<code>driver.ErrBadConn</code>便于<code>database/sql</code>进行重试。</p>
+</li>
 <li><p>由于Go的runtime使用的是非阻塞（O_NONBLOCK）的socket，可以在向mysql server发送数据包前，先调用read()方法做探测：</p>
 <ul>
-<li>1.当read返回 n=0&amp;&amp;err==nil，表示对端的socket已经关闭，这种情况下返回driver.ErrBadConn，便于go的sql包进行重试。</li>
+<li>1.当read返回 n&#x3D;0&amp;&amp;err&#x3D;&#x3D;nil，表示对端的socket已经关闭，这种情况下返回driver.ErrBadConn，便于go的sql包进行重试。</li>
 <li>2.当read会返回n&gt;0，表示对端的socket有异常，依然能够读取到数据，也意味连接异常，返回driver.ErrBadConn，便于go的sql包进行重试。</li>
-<li>3.当read返回 err=EAGAIN(linux) 或者 EWOULDBLOCK(windows)，表示对端的socket未关闭，这种情况下可以复用该连接。由于是非阻塞的read，当对端没有数据可读，程序不会阻塞起来等待数据就绪，而是返回EAGAIN和EWOULDBLOCK提示目前没有数据可读，请稍后再试。</li>
+<li>3.当read返回 err&#x3D;EAGAIN(linux) 或者 EWOULDBLOCK(windows)，表示对端的socket未关闭，这种情况下可以复用该连接。由于是非阻塞的read，当对端没有数据可读，程序不会阻塞起来等待数据就绪，而是返回EAGAIN和EWOULDBLOCK提示目前没有数据可读，请稍后再试。</li>
 </ul>
 </li>
 <li><p>刚从pool拿出的连接，如果探测结果为是上面第1和第2种情况，则返回<code>driver.ErrBadConn</code>给上层go官方包便于进行重试；如果探测结果为 EAGAIN 或者 EWOULDBLOCK则可以继续使用此连接。</p>
 </li>
-<li>没有放进pool的连接不需要进行探测，直接复用。</li>
+<li><p>没有放进pool的连接不需要进行探测，直接复用。</p>
+</li>
 </ul>
 <p>使用最新的master，经测试mysql server关闭连接后，再执行sql会输出以下日志，其为mysql驱动输出，并且程序不报错。在mysql client执行 <code>show full processlist</code> 能够看到两条连接的建立，即第一条连接被sever关闭后，由于探测发现连接被关闭，所以不会使用原先的连接而是重新建立连接。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[mysql] 2019/08/01 19:45:15 packets.go:122: closing bad idle connection: EOF</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[mysql] 2019/08/01 19:45:15 packets.go:122: closing bad idle connection: EOF</span><br></pre></td></tr></table></figure>
+
 <p>小结：</p>
 <ul>
 <li>优点：<ul>
@@ -523,448 +346,84 @@
 <p>2.如果要使用具有探测socket功能版本，等下一个release版本，可以不用设置SetConnMaxLifetime。</p>
 <p>3.如果暂时不需要更新，能够接受重复执行sql的风险，也最好通过SetConnMaxLifetime设置DB最长使用连接时间，并且要比mysql的<code>wait_timeout</code>小。</p>
 <h2 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h2><ul>
-<li>Server timeouts broken since #302 <a href="https://github.com/go-sql-driver/mysql/issues/657" target="_blank" rel="noopener">https://github.com/go-sql-driver/mysql/issues/657</a></li>
-<li>packets: Check connection liveness before writing query <a href="https://github.com/go-sql-driver/mysql/pull/934" target="_blank" rel="noopener">https://github.com/go-sql-driver/mysql/pull/934</a></li>
-<li>Go SQL client attempts write against broken connections <a href="https://github.com/go-sql-driver/mysql/issues/529" target="_blank" rel="noopener">https://github.com/go-sql-driver/mysql/issues/529</a></li>
-<li>Check connection liveness before sending query <a href="https://github.com/go-sql-driver/mysql/issues/882" target="_blank" rel="noopener">https://github.com/go-sql-driver/mysql/issues/882</a></li>
-<li>Golang网络库中socket阻塞调度源码剖析 <a href="https://studygolang.com/articles/4977" target="_blank" rel="noopener">https://studygolang.com/articles/4977</a></li>
-<li>Linux中的EAGAIN含义 <a href="https://www.cnblogs.com/pigerhan/archive/2013/02/27/2935403.html" target="_blank" rel="noopener">https://www.cnblogs.com/pigerhan/archive/2013/02/27/2935403.html</a></li>
+<li>Server timeouts broken since #302 <a href="https://github.com/go-sql-driver/mysql/issues/657">https://github.com/go-sql-driver/mysql/issues/657</a></li>
+<li>packets: Check connection liveness before writing query <a href="https://github.com/go-sql-driver/mysql/pull/934">https://github.com/go-sql-driver/mysql/pull/934</a></li>
+<li>Go SQL client attempts write against broken connections <a href="https://github.com/go-sql-driver/mysql/issues/529">https://github.com/go-sql-driver/mysql/issues/529</a></li>
+<li>Check connection liveness before sending query <a href="https://github.com/go-sql-driver/mysql/issues/882">https://github.com/go-sql-driver/mysql/issues/882</a></li>
+<li>Golang网络库中socket阻塞调度源码剖析 <a href="https://studygolang.com/articles/4977">https://studygolang.com/articles/4977</a></li>
+<li>Linux中的EAGAIN含义 <a href="https://www.cnblogs.com/pigerhan/archive/2013/02/27/2935403.html">https://www.cnblogs.com/pigerhan/archive/2013/02/27/2935403.html</a></li>
 </ul>
 
-      
     </div>
 
     
-
     
-    
-    
-
-    
-
-    
-      
-    
-    
-
     
 
     <footer class="post-footer">
-      
+          <div class="post-tags">
+              <a href="/tags/go/" rel="tag"># go</a>
+              <a href="/tags/mysql/" rel="tag"># mysql</a>
+          </div>
+
         
-          
-        
-        <div class="post-tags">
-          
-            <a href="/tags/go/" rel="tag"># go</a>
-          
-            <a href="/tags/mysql/" rel="tag"># mysql</a>
-          
-        </div>
-      
 
-      
-      
-      
-
-      
-        <div class="post-nav">
-          <div class="post-nav-next post-nav-item">
-            
-              <a href="/2019/11/09/浅谈golang对mysql时间类型数据转换的问题.html" rel="next" title="浅谈golang对mysql时间类型数据转换的问题">
-                <i class="fa fa-chevron-left"></i> 浅谈golang对mysql时间类型数据转换的问题
-              </a>
-            
-          </div>
-
-          <span class="post-nav-divider"></span>
-
-          <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2019/12/16/Spark学习系列之一：新手常见问题.html" rel="prev" title="Spark学习系列之一：新手常见问题">
-                Spark学习系列之一：新手常见问题 <i class="fa fa-chevron-right"></i>
-              </a>
-            
-          </div>
-        </div>
-      
-
-      
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-  </div>
-
-
-          </div>
-          
-
-  
-
-
-
-        </div>
-        
-          
-  
-  <div class="sidebar-toggle">
-    <div class="sidebar-toggle-line-wrap">
-      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
-      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
-      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
-    </div>
-  </div>
-
-  <aside id="sidebar" class="sidebar">
-    <div class="sidebar-inner">
-
-      
-
-      
-        <ul class="sidebar-nav motion-element">
-          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
-            Table of Contents
-          </li>
-          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
-            Overview
-          </li>
-        </ul>
-      
-
-      <div class="site-overview-wrap sidebar-panel">
-        <div class="site-overview">
-          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-            
-              <p class="site-author-name" itemprop="name">Long</p>
-              <div class="site-description motion-element" itemprop="description"></div>
-          </div>
-
-          
-            <nav class="site-state motion-element">
-              
-                <div class="site-state-item site-state-posts">
-                
-                  <a href="/archives/">
-                
-                    <span class="site-state-item-count">20</span>
-                    <span class="site-state-item-name">posts</span>
-                  </a>
-                </div>
-              
-
-              
-
-              
-                
-                
-                <div class="site-state-item site-state-tags">
-                  
-                    
-                      <a href="/tags/">
-                    
-                  
-                    
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                      
-                    
-                    <span class="site-state-item-count">15</span>
-                    <span class="site-state-item-name">tags</span>
-                  </a>
-                </div>
-              
-            </nav>
-          
-
-          
-
-          
-
-          
-            <div class="links-of-author motion-element">
-              
-                <span class="links-of-author-item">
-                  
-                  
-                    
-                  
-                  
-                    
-                  
-                  <a href="https://github.com/salmon7" title="GitHub &rarr; https://github.com/salmon7" rel="noopener" target="_blank"><i class="fa fa-fw fa-github"></i>GitHub</a>
-                </span>
-              
-                <span class="links-of-author-item">
-                  
-                  
-                    
-                  
-                  
-                    
-                  
-                  <a href="mailto:qilong_zhang@163.com" title="E-Mail &rarr; mailto:qilong_zhang@163.com" rel="noopener" target="_blank"><i class="fa fa-fw fa-envelope"></i>E-Mail</a>
-                </span>
-              
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2019/11/09/%E6%B5%85%E8%B0%88golang%E5%AF%B9mysql%E6%97%B6%E9%97%B4%E7%B1%BB%E5%9E%8B%E6%95%B0%E6%8D%AE%E8%BD%AC%E6%8D%A2%E7%9A%84%E9%97%AE%E9%A2%98.html" rel="prev" title="浅谈golang对mysql时间类型数据转换的问题">
+                  <i class="fa fa-angle-left"></i> 浅谈golang对mysql时间类型数据转换的问题
+                </a>
             </div>
-          
-
-          
-
-          
-          
-
-          
-            
-          
-          
-
-        </div>
-      </div>
-
-      
-      <!--noindex-->
-        <div class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
-          <div class="post-toc">
-
-            
-            
-            
-            
-
-            
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#线上场景"><span class="nav-number">1.</span> <span class="nav-text">线上场景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#问题复现"><span class="nav-number">2.</span> <span class="nav-text">问题复现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-设置mysql-server主动关闭连接时间"><span class="nav-number">2.1.</span> <span class="nav-text">1.设置mysql server主动关闭连接时间</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-运行tcpdump和测试demo"><span class="nav-number">2.2.</span> <span class="nav-text">2.运行tcpdump和测试demo</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-分析tcp数据包"><span class="nav-number">2.3.</span> <span class="nav-text">3.分析tcp数据包</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#小结"><span class="nav-number">2.4.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#mysql-server连接和golang数据库连接池的复用时间"><span class="nav-number">3.</span> <span class="nav-text">mysql server连接和golang数据库连接池的复用时间</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-mysql连接复用时间"><span class="nav-number">3.1.</span> <span class="nav-text">1.mysql连接复用时间</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-golang数据库连接池复用时间"><span class="nav-number">3.2.</span> <span class="nav-text">2.golang数据库连接池复用时间</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-对业务的影响"><span class="nav-number">3.3.</span> <span class="nav-text">3.对业务的影响</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#解决方案"><span class="nav-number">4.</span> <span class="nav-text">解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#解决方案一：更新mysql驱动到目前最新release版本-v1-4-1"><span class="nav-number">4.1.</span> <span class="nav-text">解决方案一：更新mysql驱动到目前最新release版本-v1.4.1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#解决方案二：更新mysql驱动到最新的master"><span class="nav-number">4.2.</span> <span class="nav-text">解决方案二：更新mysql驱动到最新的master</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#解决方案三：不升级mysql驱动版本"><span class="nav-number">4.3.</span> <span class="nav-text">解决方案三：不升级mysql驱动版本</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#总结"><span class="nav-number">5.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#参考链接"><span class="nav-number">6.</span> <span class="nav-text">参考链接</span></a></li></ol></div>
-            
-
+            <div class="post-nav-item">
+                <a href="/2019/12/16/Spark%E5%AD%A6%E4%B9%A0%E7%B3%BB%E5%88%97%E4%B9%8B%E4%B8%80%EF%BC%9A%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98.html" rel="next" title="Spark学习系列之一：新手常见问题">
+                  Spark学习系列之一：新手常见问题 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
           </div>
-        </div>
-      <!--/noindex-->
-      
-
-      
-
-    </div>
-  </aside>
-  
-
-
-        
-      </div>
-    </main>
-
-    <footer id="footer" class="footer">
-      <div class="footer-inner">
-        <div class="copyright">&copy; 2018 – <span itemprop="copyrightYear">2020</span>
-  <span class="with-love" id="animate">
-    <i class="fa fa-user"></i>
-  </span>
-  <span class="author" itemprop="copyrightHolder">Long</span>
-
-  
-
-  
+    </footer>
+  </article>
 </div>
 
 
-  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> v3.9.0</div>
-
-
-
-  <span class="post-meta-divider">|</span>
-
-
-
-  <div class="theme-info">Theme – <a href="https://theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> v7.2.0</div>
 
 
 
 
-        
+</div>
+  </main>
 
+  <footer class="footer">
+    <div class="footer-inner">
 
-
-
-
-
-
-
-        
-      </div>
-    </footer>
-
-    
-      <div class="back-to-top">
-        <i class="fa fa-arrow-up"></i>
-        
-      </div>
-    
-
-    
-
-    
-
-    
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Long</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
   </div>
 
-  
-
-<script>
-  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
-    window.Promise = null;
-  }
-</script>
-
-
-
-
-
-
-
-
-
-
-
-
-
+    </div>
+  </footer>
 
   
-    
-    
-      
-    
-  
-  <script color="0,0,255" opacity="0.5" zindex="-1" count="99" src="//cdn.jsdelivr.net/gh/theme-next/theme-next-canvas-nest@1/canvas-nest.min.js"></script>
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-  
-  <script src="/lib/jquery/index.js?v=3.4.1"></script>
-
-  
-  <script src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
-
-  
-  <script src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
-
-
-  
-
-
-  <script src="/js/utils.js?v=7.2.0"></script>
-
-  <script src="/js/motion.js?v=7.2.0"></script>
-
-
-
-  
-  
-
-
-  <script src="/js/affix.js?v=7.2.0"></script>
-
-  <script src="/js/schemes/pisces.js?v=7.2.0"></script>
-
-
-
-
-  
-  <script src="/js/scrollspy.js?v=7.2.0"></script>
-<script src="/js/post-details.js?v=7.2.0"></script>
-
-
-
-  
-
-
-  <script src="/js/next-boot.js?v=7.2.0"></script>
-
-
-  
-
-  
-
-  
-
-  
-
-
-  
-
-
-  
-
-
-
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
 
 </body>
 </html>
