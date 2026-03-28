@@ -150,6 +150,102 @@ kafka topic 对应的 parition 个数为1
       </tags>
   </entry>
   <entry>
+    <title>Spark学习系列之二：rdd分区数量分析</title>
+    <url>/2019/12/22/Spark%E5%AD%A6%E4%B9%A0%E7%B3%BB%E5%88%97%E4%B9%8B%E4%BA%8C%EF%BC%9Ardd%E5%88%86%E5%8C%BA%E6%95%B0%E9%87%8F%E5%88%86%E6%9E%90.html</url>
+    <content><![CDATA[
+如无特别说明，本文源码版本为 spark 2.3.4
+
+创建rdd有三种方式，一种是通过SparkContext.textFile()访问外部存储创建，一种是通过输入数据集合通过调用 SparkContext.parallelize() 方法来创建，最后一种是通过转换已有的rdd生成新的rdd。
+通过parallelize创建rdd的分区数量分析通过parallelize的方式比较简单，相信也是大部分初学者第一次接触创建rdd的方法，那么通过这个方法创建的rdd的默认分区数是多少呢？我们通过源码进行分析。
+package org.apache.spark.SparkContextclass SparkContext(config: SparkConf) extends Logging &#123;  /** Default level of parallelism to use when not given by user (e.g. parallelize and makeRDD). */  def defaultParallelism: Int = &#123;    assertNotStopped()    taskScheduler.defaultParallelism  &#125;    def parallelize[T: ClassTag](      seq: Seq[T],      numSlices: Int = defaultParallelism): RDD[T] = withScope &#123;    assertNotStopped()    new ParallelCollectionRDD[T](this, seq, numSlices, Map[Int, Seq[String]]())  &#125;&#125;
+
+我们先看看parallelize是如何生成rdd的。可以看到它是通过 ParallelCollectionRDD 类创建一个rdd，其内部返回的partitioner是通过ParallelCollectionRDD伴生对象的slice方法分割seq为一个二维的Seq[Seq[T]]，并把这个二维的序列传递到ParallelCollectionPartition中实例化的。
+接下来是关键，defaultParallelism的默认值确定了分区的数量。
+
+
+package org.apache.spark.SparkContextclass SparkContext(config: SparkConf) extends Logging &#123;  private var _taskScheduler: TaskScheduler = _    // 等于task调度器的defaultParallelism  def defaultParallelism: Int = &#123;    assertNotStopped()    taskScheduler.defaultParallelism  &#125;&#125;  --------package org.apache.spark.scheduler// 特质TaskScheduler，定义task调度器的方法private[spark] trait TaskScheduler &#123;  // 定义获取默认并行度的接口  def defaultParallelism(): Int&#125;--------package org.apache.spark.scheduler// TaskScheduler的具体实现类private[spark] class TaskSchedulerImpl(    val sc: SparkContext,    val maxTaskFailures: Int,    isLocal: Boolean = false)  extends TaskScheduler with Logging &#123;    // 后台调度器特质  var backend: SchedulerBackend = null  // 实现了TaskScheduler中的defaultParallelism接口，并返回从成员变量后台调度器特质backend返回backend.defaultParallelism()  override def defaultParallelism(): Int = backend.defaultParallelism()&#125;--------package org.apache.spark.scheduler// 定义后台调度器特质private[spark] trait SchedulerBackend &#123;  // 定义抽象方法  def defaultParallelism(): Int&#125;--------package org.apache.spark.scheduler.local// 本地后台调度器，为SchedulerBackend特质的一种具体实现private[spark] class LocalSchedulerBackend(    conf: SparkConf,    scheduler: TaskSchedulerImpl,    val totalCores: Int)  extends SchedulerBackend with ExecutorBackend with Logging &#123;    // 实现SchedulerBackend中的defaultParallelism方法，返回配置中的&quot;spark.default.parallelism&quot;，  // 如果没有定义则返回从SparkContext传入的totalCores。SparkContex的master为 local 则totalCores=1；  // master为local[*] 则totalCores=Runtime.getRuntime.availableProcessors()；  // master为local[N]，则totalCores=N  // 传入totalcores的计算见org.apache.spark.SparkContext.createTaskScheduler()方法  override def defaultParallelism(): Int =    scheduler.conf.getInt(&quot;spark.default.parallelism&quot;, totalCores)&#125;--------package org.apache.spark.scheduler.cluster// 为StandaloneSchedulerBackend调度器的父类，适用于standalone模式private[spark]class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: RpcEnv)  extends ExecutorAllocationClient with SchedulerBackend with Logging &#123;    // Use an atomic variable to track total number of cores in the cluster for simplicity and speed  // totalCoreCount会根据注册/解注册的executor的core数量动态进行增减  protected val totalCoreCount = new AtomicInteger(0)  protected val conf = scheduler.sc.conf    // 实现SchedulerBackend中的defaultParallelism方法，返回配置中的&quot;spark.default.parallelism&quot;，  // 如果没有定义则返回 max(totalCoreCount, 2)，注意totalCoreCount并不一定是运行命令时`--total-executor-cores`申请spark.cores.max值  // totalCoreCount小于spark.cores.max，当集群资源不够或者超时时，也会直接运行：  // 1. 计算totalCoreCount &gt; spark.cores.max * spark.scheduler.minRegisteredResourcesRatio（默认为0）  // 2. 计算等待时间 maxRegisteredWaitingTimeMs，当其大于spark.scheduler.maxRegisteredResourcesWaitingTime（默认为30s）时  override def defaultParallelism(): Int = &#123;    conf.getInt(&quot;spark.default.parallelism&quot;, math.max(totalCoreCount.get(), 2))  &#125;&#125;
+
+通过以上分析，我们可知通过parallelize创建rdd时，分区数量根据以下情况确定
+
+如果部署模式为local：
+如果定义了spark.default.parallelism则以其值作为分区大小
+如果没有定义spark.default.parallelism，则以解析master参数中指定的值为分区大小
+
+
+如果部署模式为standalone：
+如果定义了spark.default.parallelism则以其值作为分区大小
+如果没有定义spark.default.parallelism，则为math.max(totalCoreCount, 2)，其中totalCoreCount为executor注册的所拥有core数量，不一定是申请core的总数。
+
+
+
+
+TODO yarn模式的还未考虑，以后有时间加进来
+
+对现有rdd进行transformation后分区数量分析上一小节通过分析后台调度器的相关源码，我们已经知道通过parallelize创建rdd时partition的确定方法。这一节我们探讨通过转换前后分区数量如何确定。
+以map()为例package org.apache.spark.rdd// map等转换的底层实现是MapPartitionsRDDprivate[spark] class MapPartitionsRDD[U: ClassTag, T: ClassTag](    var prev: RDD[T],    f: (TaskContext, Int, Iterator[T]) =&gt; Iterator[U],  // (TaskContext, partition index, iterator)    preservesPartitioning: Boolean = false,    isOrderSensitive: Boolean = false)  extends RDD[U](prev) &#123;  // 这里需要注意，实例化MapPartitionsRDD时，会调用RDD的单参数rdd的构造方法。    // 分区器继承血统中第一个父类的partitioner（对于map来说只有一个父rdd），如果有的话  override val partitioner = if (preservesPartitioning) firstParent[T].partitioner else None  // 分区继承血统中第一个父类的partitions（对于map来说只有一个父rdd）  override def getPartitions: Array[Partition] = firstParent[T].partitions  override def compute(split: Partition, context: TaskContext): Iterator[U] =    f(context, split.index, firstParent[T].iterator(split, context))  &#125;abstract class RDD[T: ClassTag](    @transient private var _sc: SparkContext,    @transient private var deps: Seq[Dependency[_]]  ) extends Serializable with Logging &#123;  /** Construct an RDD with just a one-to-one dependency on one parent */  // 实现单参数rdd的构造方法  def this(@transient oneParent: RDD[_]) =    this(oneParent.context, List(new OneToOneDependency(oneParent)))  /**   * Implemented by subclasses to return how this RDD depends on parent RDDs. This method will only   * be called once, so it is safe to implement a time-consuming computation in it.   */  // getDependencies等于rdd构造方法参数中的deps  protected def getDependencies: Seq[Dependency[_]] = deps  /**   * Get the list of dependencies of this RDD, taking into account whether the   * RDD is checkpointed or not.   */  final def dependencies: Seq[Dependency[_]] = &#123;    checkpointRDD.map(r =&gt; List(new OneToOneDependency(r))).getOrElse &#123;      if (dependencies_ == null) &#123;        // 先不考虑checkpoint的情况，则dependencies= dependencies_ = getDependencies        dependencies_ = getDependencies      &#125;      dependencies_    &#125;  &#125;    /** Returns the first parent RDD */  protected[spark] def firstParent[U: ClassTag]: RDD[U] = &#123;    // firstParent为dependencies容器中第一个元素    dependencies.head.rdd.asInstanceOf[RDD[U]]  &#125;&#125;
+
+这里需要注意区分Partitioner和Partition。Partitioner是分区器，需要定义分区的数量numPartitions，以及通过传入key决定其在哪个partition的getPartition(key: Any)方法。而Partition则描述了当前rdd的分区状态，对于map而言其分区状态和父rdd一致。当然rdd也可以没有Partitioner就有Parition的情况，如默认情况下经过map转换的rdd，以及本文第一部分描述通过parallelize创建rdd，都是没有partitioner，其partitioner为None。
+通过追溯firstParent，可知firstParent &lt;- dependencies.head &lt;- dependencies_.head &lt;- getDependencies.head &lt;- deps.head &lt;- List(new OneToOneDependency(pre).head (这里完成rdd到dependency的转换)，其中pre为调用map方法的rdd，即 MapPartitionsRDD 的父rdd。
+回到map的paritions数量为多少的问题，从源码中也能看到其partitions将保持血统中第一个的父类的partition，不会改变原有的分区情况。但是也不会保留原有的分区器。
+而类似的，flatMap的实现也和map一致。filter也差不多，由于其不会更改父rdd的key，所以preservesPartitioning为true，保留了血统中第一个父类的partitioner。
+以reduceByKey()为例package org.apache.spark.rddclass PairRDDFunctions[K, V](self: RDD[(K, V)])    (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null)  extends Logging with Serializable &#123;  def reduceByKey(func: (V, V) =&gt; V): RDD[(K, V)] = self.withScope &#123;    // 通过org.apache.spark.Partitioner.defaultPartitioner创建分区器    reduceByKey(defaultPartitioner(self), func)  &#125;&#125;--------package org.apache.spark/** * An object that defines how the elements in a key-value pair RDD are partitioned by key. * Maps each key to a partition ID, from 0 to `numPartitions - 1`. * * Note that, partitioner must be deterministic, i.e. it must return the same partition id given * the same partition key. */ // 抽象分区器abstract class Partitioner extends Serializable &#123;  // 需要分多少个区  def numPartitions: Int  // 传入key，就返回其应该存在哪个分区  def getPartition(key: Any): Int&#125;object Partitioner &#123;  /**   * Choose a partitioner to use for a cogroup-like operation between a number of RDDs.   *   * If spark.default.parallelism is set, we&#x27;ll use the value of SparkContext defaultParallelism   * as the default partitions number, otherwise we&#x27;ll use the max number of upstream partitions.   *   * When available, we choose the partitioner from rdds with maximum number of partitions. If this   * partitioner is eligible (number of partitions within an order of maximum number of partitions   * in rdds), or has partition number higher than default partitions number - we use this   * partitioner.   *   * Otherwise, we&#x27;ll use a new HashPartitioner with the default partitions number.   *   * Unless spark.default.parallelism is set, the number of partitions will be the same as the   * number of partitions in the largest upstream RDD, as this should be least likely to cause   * out-of-memory errors.   *   * We use two method parameters (rdd, others) to enforce callers passing at least 1 RDD.   */  // 传入一个rdd以及传入可变长rdd参数 other（即可以不传，也可以传一个或者多个）  def defaultPartitioner(rdd: RDD[_], others: RDD[_]*): Partitioner = &#123;    // 拼接两个rdd到序列    val rdds = (Seq(rdd) ++ others)    // 过滤rdds序列中有partitioner并且对应的numPartitions&gt;0的rdds序列    val hasPartitioner = rdds.filter(_.partitioner.exists(_.numPartitions &gt; 0))	    // 从rdds序列中选择partitioner中partition数量的rdd，称为最大分区器rdd    val hasMaxPartitioner: Option[RDD[_]] = if (hasPartitioner.nonEmpty) &#123;      Some(hasPartitioner.maxBy(_.partitions.length))    &#125; else &#123;      None    &#125;    // 定义默认的分区数量    val defaultNumPartitions = if (rdd.context.conf.contains(&quot;spark.default.parallelism&quot;)) &#123;      // 如果定义了&quot;spark.default.parallelism&quot;，则为其值      rdd.context.defaultParallelism    &#125; else &#123;      // 否则为rdds序列中各个rdd分区数的最大值      rdds.map(_.partitions.length).max    &#125;    // If the existing max partitioner is an eligible one, or its partitions number is larger    // than the default number of partitions, use the existing partitioner.    if (hasMaxPartitioner.nonEmpty &amp;&amp; (isEligiblePartitioner(hasMaxPartitioner.get, rdds) ||        defaultNumPartitions &lt; hasMaxPartitioner.get.getNumPartitions)) &#123;      // 如果有最大分区器rdd，并且其分区数是合理的；或者有最大分区器rdd，并且其分区数量大于默认的分区数量defaultNumPartitions；返回最大分区器rdd的partitioner      // 这个if-else语句嵌套到上一个if-else语句的话，代码会更加清晰？      hasMaxPartitioner.get.partitioner.get    &#125; else &#123;      // 否则将以默认分区数量defaultNumPartitions实例化一个HashPartitioner，并返回      new HashPartitioner(defaultNumPartitions)    &#125;  &#125;  /**   * Returns true if the number of partitions of the RDD is either greater than or is less than and   * within a single order of magnitude of the max number of upstream partitions, otherwise returns   * false.   */  // 判断最大分区器的rdd的分区数目对于其他rdd是否合理  private def isEligiblePartitioner(     hasMaxPartitioner: RDD[_],     rdds: Seq[RDD[_]]): Boolean = &#123;    // 获取rdds序列中最大的分区数量    val maxPartitions = rdds.map(_.partitions.length).max    // 如果rdds序列中最大的分区数量不大于最大分区器分区数量一个数量级，则返回true；否则返回false    log10(maxPartitions) - log10(hasMaxPartitioner.getNumPartitions) &lt; 1  &#125;&#125;
+
+对于reduceByKey方法，当不传numPartitions参数时，其默认的分区器由defaultPartitioner()方法决定，分区器就决定了分区数。
+defaultPartitioner()的决定分区器规则总结如下：
+
+如果定义了”spark.default.parallelism”，则defaultNumPartitions &#x3D; “spark.default.parallelism” ；如果未定义，则defaultNumPartitions等于所有rdd分区中最大的分区数
+如果在所有rdd中有对应的partitioner，则选出分区数量最大的partitioner，并且该partitioner的分区数满足以下两个条件之一，则返回该partitioner作为API的partitioner
+分区数量是合理的
+分区数量大于defaultNumPartitions
+
+
+否则，返回HashPartitioner(defaultNumPartitions)
+
+总结，对于reduceByKey等类似的API而言，只要是通过defaultPartitioner()定义分区器的，其分区数量有三种情况：
+
+等于默认值spark.default.parallelism
+等于所有rdd中最大partition数量
+等于所有partitioner中最大partition数量
+
+也可以看出此类型的转换，partition数量总是趋向于变大，而”spark.default.parallelism”是个平衡点。
+如果定义了”spark.default.parallelism”：
+
+如果它定义的很小，对于没有分区器则分区数量很小。对于有分区器，defaultNumPartitions &lt; hasMaxPartitioner.get.getNumPartitions几乎永远为true，将保持最大分区器的分区数量，不会主动干预原来的分区情况。
+如果它定义的很大，对于没有分区器则分区数量很大。对于有分区器，defaultNumPartitions &lt; hasMaxPartitioner.get.getNumPartitions几乎永远为false，结果依赖于最大分区器的分区数量小于分区数量最大的rdd的程度，如果相差不大则保留原来的分区器，如果相差很大，则以”spark.default.parallelism”作为新分区大小。
+
+如果没定义”spark.default.parallelism”：
+
+对于没有分区器，则分区数量等于所有rdd中最大partition数量。
+对于有分区器，defaultNumPartitions &lt; hasMaxPartitioner.get.getNumPartitions永远为false，结果依赖于最大分区器的分区数小于分区数量最大的rdd的程度，如果相差不大则保留原来的分区器，如果相差很大，则以所有rdd的最大分区数为新分区大小。
+
+保持partitioner的transformation如上所述，rdd的parittioner是决定分区数量的重要因素，对于以下transformation 默认 将会保留和传播partitioner: 
+
+cogroup
+groupWith
+join
+leftOuterJoin
+rightOuterJoin
+groupByKey
+reduceByKey
+foldByKey
+combineByKey
+partitionBy
+mapValues 
+flatMapValues 
+filter
+
+其他transfermation将默认不保持分区器。因为其他操作（比如map）可能会修改key，修改了key后，原来的分区器就失去了它的意义。相反的，mapValues只修改value不修改key，所以其保留和传播分区器是合理的。
+参考https://github.com/rohgar/scala-spark-4/wiki/Partitioning
+
+TODO 通过文件创建rdd还未考虑，以后有时间加进来本文为学习过程中产生的总结，由于学艺不精可能有些观点或者描述有误，还望各位同学帮忙指正，共同进步。
+
+]]></content>
+      <tags>
+        <tag>spark</tag>
+        <tag>scala</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>Spark学习系列之三：join的宽依赖vs.窄依赖</title>
     <url>/2020/01/02/Spark%E5%AD%A6%E4%B9%A0%E7%B3%BB%E5%88%97%E4%B9%8B%E4%B8%89%EF%BC%9Ajoin%E7%9A%84%E5%AE%BD%E4%BE%9D%E8%B5%96vs-%E7%AA%84%E4%BE%9D%E8%B5%96.html</url>
     <content><![CDATA[
@@ -342,102 +438,6 @@ O
       </tags>
   </entry>
   <entry>
-    <title>Spark学习系列之二：rdd分区数量分析</title>
-    <url>/2019/12/22/Spark%E5%AD%A6%E4%B9%A0%E7%B3%BB%E5%88%97%E4%B9%8B%E4%BA%8C%EF%BC%9Ardd%E5%88%86%E5%8C%BA%E6%95%B0%E9%87%8F%E5%88%86%E6%9E%90.html</url>
-    <content><![CDATA[
-如无特别说明，本文源码版本为 spark 2.3.4
-
-创建rdd有三种方式，一种是通过SparkContext.textFile()访问外部存储创建，一种是通过输入数据集合通过调用 SparkContext.parallelize() 方法来创建，最后一种是通过转换已有的rdd生成新的rdd。
-通过parallelize创建rdd的分区数量分析通过parallelize的方式比较简单，相信也是大部分初学者第一次接触创建rdd的方法，那么通过这个方法创建的rdd的默认分区数是多少呢？我们通过源码进行分析。
-package org.apache.spark.SparkContextclass SparkContext(config: SparkConf) extends Logging &#123;  /** Default level of parallelism to use when not given by user (e.g. parallelize and makeRDD). */  def defaultParallelism: Int = &#123;    assertNotStopped()    taskScheduler.defaultParallelism  &#125;    def parallelize[T: ClassTag](      seq: Seq[T],      numSlices: Int = defaultParallelism): RDD[T] = withScope &#123;    assertNotStopped()    new ParallelCollectionRDD[T](this, seq, numSlices, Map[Int, Seq[String]]())  &#125;&#125;
-
-我们先看看parallelize是如何生成rdd的。可以看到它是通过 ParallelCollectionRDD 类创建一个rdd，其内部返回的partitioner是通过ParallelCollectionRDD伴生对象的slice方法分割seq为一个二维的Seq[Seq[T]]，并把这个二维的序列传递到ParallelCollectionPartition中实例化的。
-接下来是关键，defaultParallelism的默认值确定了分区的数量。
-
-
-package org.apache.spark.SparkContextclass SparkContext(config: SparkConf) extends Logging &#123;  private var _taskScheduler: TaskScheduler = _    // 等于task调度器的defaultParallelism  def defaultParallelism: Int = &#123;    assertNotStopped()    taskScheduler.defaultParallelism  &#125;&#125;  --------package org.apache.spark.scheduler// 特质TaskScheduler，定义task调度器的方法private[spark] trait TaskScheduler &#123;  // 定义获取默认并行度的接口  def defaultParallelism(): Int&#125;--------package org.apache.spark.scheduler// TaskScheduler的具体实现类private[spark] class TaskSchedulerImpl(    val sc: SparkContext,    val maxTaskFailures: Int,    isLocal: Boolean = false)  extends TaskScheduler with Logging &#123;    // 后台调度器特质  var backend: SchedulerBackend = null  // 实现了TaskScheduler中的defaultParallelism接口，并返回从成员变量后台调度器特质backend返回backend.defaultParallelism()  override def defaultParallelism(): Int = backend.defaultParallelism()&#125;--------package org.apache.spark.scheduler// 定义后台调度器特质private[spark] trait SchedulerBackend &#123;  // 定义抽象方法  def defaultParallelism(): Int&#125;--------package org.apache.spark.scheduler.local// 本地后台调度器，为SchedulerBackend特质的一种具体实现private[spark] class LocalSchedulerBackend(    conf: SparkConf,    scheduler: TaskSchedulerImpl,    val totalCores: Int)  extends SchedulerBackend with ExecutorBackend with Logging &#123;    // 实现SchedulerBackend中的defaultParallelism方法，返回配置中的&quot;spark.default.parallelism&quot;，  // 如果没有定义则返回从SparkContext传入的totalCores。SparkContex的master为 local 则totalCores=1；  // master为local[*] 则totalCores=Runtime.getRuntime.availableProcessors()；  // master为local[N]，则totalCores=N  // 传入totalcores的计算见org.apache.spark.SparkContext.createTaskScheduler()方法  override def defaultParallelism(): Int =    scheduler.conf.getInt(&quot;spark.default.parallelism&quot;, totalCores)&#125;--------package org.apache.spark.scheduler.cluster// 为StandaloneSchedulerBackend调度器的父类，适用于standalone模式private[spark]class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: RpcEnv)  extends ExecutorAllocationClient with SchedulerBackend with Logging &#123;    // Use an atomic variable to track total number of cores in the cluster for simplicity and speed  // totalCoreCount会根据注册/解注册的executor的core数量动态进行增减  protected val totalCoreCount = new AtomicInteger(0)  protected val conf = scheduler.sc.conf    // 实现SchedulerBackend中的defaultParallelism方法，返回配置中的&quot;spark.default.parallelism&quot;，  // 如果没有定义则返回 max(totalCoreCount, 2)，注意totalCoreCount并不一定是运行命令时`--total-executor-cores`申请spark.cores.max值  // totalCoreCount小于spark.cores.max，当集群资源不够或者超时时，也会直接运行：  // 1. 计算totalCoreCount &gt; spark.cores.max * spark.scheduler.minRegisteredResourcesRatio（默认为0）  // 2. 计算等待时间 maxRegisteredWaitingTimeMs，当其大于spark.scheduler.maxRegisteredResourcesWaitingTime（默认为30s）时  override def defaultParallelism(): Int = &#123;    conf.getInt(&quot;spark.default.parallelism&quot;, math.max(totalCoreCount.get(), 2))  &#125;&#125;
-
-通过以上分析，我们可知通过parallelize创建rdd时，分区数量根据以下情况确定
-
-如果部署模式为local：
-如果定义了spark.default.parallelism则以其值作为分区大小
-如果没有定义spark.default.parallelism，则以解析master参数中指定的值为分区大小
-
-
-如果部署模式为standalone：
-如果定义了spark.default.parallelism则以其值作为分区大小
-如果没有定义spark.default.parallelism，则为math.max(totalCoreCount, 2)，其中totalCoreCount为executor注册的所拥有core数量，不一定是申请core的总数。
-
-
-
-
-TODO yarn模式的还未考虑，以后有时间加进来
-
-对现有rdd进行transformation后分区数量分析上一小节通过分析后台调度器的相关源码，我们已经知道通过parallelize创建rdd时partition的确定方法。这一节我们探讨通过转换前后分区数量如何确定。
-以map()为例package org.apache.spark.rdd// map等转换的底层实现是MapPartitionsRDDprivate[spark] class MapPartitionsRDD[U: ClassTag, T: ClassTag](    var prev: RDD[T],    f: (TaskContext, Int, Iterator[T]) =&gt; Iterator[U],  // (TaskContext, partition index, iterator)    preservesPartitioning: Boolean = false,    isOrderSensitive: Boolean = false)  extends RDD[U](prev) &#123;  // 这里需要注意，实例化MapPartitionsRDD时，会调用RDD的单参数rdd的构造方法。    // 分区器继承血统中第一个父类的partitioner（对于map来说只有一个父rdd），如果有的话  override val partitioner = if (preservesPartitioning) firstParent[T].partitioner else None  // 分区继承血统中第一个父类的partitions（对于map来说只有一个父rdd）  override def getPartitions: Array[Partition] = firstParent[T].partitions  override def compute(split: Partition, context: TaskContext): Iterator[U] =    f(context, split.index, firstParent[T].iterator(split, context))  &#125;abstract class RDD[T: ClassTag](    @transient private var _sc: SparkContext,    @transient private var deps: Seq[Dependency[_]]  ) extends Serializable with Logging &#123;  /** Construct an RDD with just a one-to-one dependency on one parent */  // 实现单参数rdd的构造方法  def this(@transient oneParent: RDD[_]) =    this(oneParent.context, List(new OneToOneDependency(oneParent)))  /**   * Implemented by subclasses to return how this RDD depends on parent RDDs. This method will only   * be called once, so it is safe to implement a time-consuming computation in it.   */  // getDependencies等于rdd构造方法参数中的deps  protected def getDependencies: Seq[Dependency[_]] = deps  /**   * Get the list of dependencies of this RDD, taking into account whether the   * RDD is checkpointed or not.   */  final def dependencies: Seq[Dependency[_]] = &#123;    checkpointRDD.map(r =&gt; List(new OneToOneDependency(r))).getOrElse &#123;      if (dependencies_ == null) &#123;        // 先不考虑checkpoint的情况，则dependencies= dependencies_ = getDependencies        dependencies_ = getDependencies      &#125;      dependencies_    &#125;  &#125;    /** Returns the first parent RDD */  protected[spark] def firstParent[U: ClassTag]: RDD[U] = &#123;    // firstParent为dependencies容器中第一个元素    dependencies.head.rdd.asInstanceOf[RDD[U]]  &#125;&#125;
-
-这里需要注意区分Partitioner和Partition。Partitioner是分区器，需要定义分区的数量numPartitions，以及通过传入key决定其在哪个partition的getPartition(key: Any)方法。而Partition则描述了当前rdd的分区状态，对于map而言其分区状态和父rdd一致。当然rdd也可以没有Partitioner就有Parition的情况，如默认情况下经过map转换的rdd，以及本文第一部分描述通过parallelize创建rdd，都是没有partitioner，其partitioner为None。
-通过追溯firstParent，可知firstParent &lt;- dependencies.head &lt;- dependencies_.head &lt;- getDependencies.head &lt;- deps.head &lt;- List(new OneToOneDependency(pre).head (这里完成rdd到dependency的转换)，其中pre为调用map方法的rdd，即 MapPartitionsRDD 的父rdd。
-回到map的paritions数量为多少的问题，从源码中也能看到其partitions将保持血统中第一个的父类的partition，不会改变原有的分区情况。但是也不会保留原有的分区器。
-而类似的，flatMap的实现也和map一致。filter也差不多，由于其不会更改父rdd的key，所以preservesPartitioning为true，保留了血统中第一个父类的partitioner。
-以reduceByKey()为例package org.apache.spark.rddclass PairRDDFunctions[K, V](self: RDD[(K, V)])    (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null)  extends Logging with Serializable &#123;  def reduceByKey(func: (V, V) =&gt; V): RDD[(K, V)] = self.withScope &#123;    // 通过org.apache.spark.Partitioner.defaultPartitioner创建分区器    reduceByKey(defaultPartitioner(self), func)  &#125;&#125;--------package org.apache.spark/** * An object that defines how the elements in a key-value pair RDD are partitioned by key. * Maps each key to a partition ID, from 0 to `numPartitions - 1`. * * Note that, partitioner must be deterministic, i.e. it must return the same partition id given * the same partition key. */ // 抽象分区器abstract class Partitioner extends Serializable &#123;  // 需要分多少个区  def numPartitions: Int  // 传入key，就返回其应该存在哪个分区  def getPartition(key: Any): Int&#125;object Partitioner &#123;  /**   * Choose a partitioner to use for a cogroup-like operation between a number of RDDs.   *   * If spark.default.parallelism is set, we&#x27;ll use the value of SparkContext defaultParallelism   * as the default partitions number, otherwise we&#x27;ll use the max number of upstream partitions.   *   * When available, we choose the partitioner from rdds with maximum number of partitions. If this   * partitioner is eligible (number of partitions within an order of maximum number of partitions   * in rdds), or has partition number higher than default partitions number - we use this   * partitioner.   *   * Otherwise, we&#x27;ll use a new HashPartitioner with the default partitions number.   *   * Unless spark.default.parallelism is set, the number of partitions will be the same as the   * number of partitions in the largest upstream RDD, as this should be least likely to cause   * out-of-memory errors.   *   * We use two method parameters (rdd, others) to enforce callers passing at least 1 RDD.   */  // 传入一个rdd以及传入可变长rdd参数 other（即可以不传，也可以传一个或者多个）  def defaultPartitioner(rdd: RDD[_], others: RDD[_]*): Partitioner = &#123;    // 拼接两个rdd到序列    val rdds = (Seq(rdd) ++ others)    // 过滤rdds序列中有partitioner并且对应的numPartitions&gt;0的rdds序列    val hasPartitioner = rdds.filter(_.partitioner.exists(_.numPartitions &gt; 0))	    // 从rdds序列中选择partitioner中partition数量的rdd，称为最大分区器rdd    val hasMaxPartitioner: Option[RDD[_]] = if (hasPartitioner.nonEmpty) &#123;      Some(hasPartitioner.maxBy(_.partitions.length))    &#125; else &#123;      None    &#125;    // 定义默认的分区数量    val defaultNumPartitions = if (rdd.context.conf.contains(&quot;spark.default.parallelism&quot;)) &#123;      // 如果定义了&quot;spark.default.parallelism&quot;，则为其值      rdd.context.defaultParallelism    &#125; else &#123;      // 否则为rdds序列中各个rdd分区数的最大值      rdds.map(_.partitions.length).max    &#125;    // If the existing max partitioner is an eligible one, or its partitions number is larger    // than the default number of partitions, use the existing partitioner.    if (hasMaxPartitioner.nonEmpty &amp;&amp; (isEligiblePartitioner(hasMaxPartitioner.get, rdds) ||        defaultNumPartitions &lt; hasMaxPartitioner.get.getNumPartitions)) &#123;      // 如果有最大分区器rdd，并且其分区数是合理的；或者有最大分区器rdd，并且其分区数量大于默认的分区数量defaultNumPartitions；返回最大分区器rdd的partitioner      // 这个if-else语句嵌套到上一个if-else语句的话，代码会更加清晰？      hasMaxPartitioner.get.partitioner.get    &#125; else &#123;      // 否则将以默认分区数量defaultNumPartitions实例化一个HashPartitioner，并返回      new HashPartitioner(defaultNumPartitions)    &#125;  &#125;  /**   * Returns true if the number of partitions of the RDD is either greater than or is less than and   * within a single order of magnitude of the max number of upstream partitions, otherwise returns   * false.   */  // 判断最大分区器的rdd的分区数目对于其他rdd是否合理  private def isEligiblePartitioner(     hasMaxPartitioner: RDD[_],     rdds: Seq[RDD[_]]): Boolean = &#123;    // 获取rdds序列中最大的分区数量    val maxPartitions = rdds.map(_.partitions.length).max    // 如果rdds序列中最大的分区数量不大于最大分区器分区数量一个数量级，则返回true；否则返回false    log10(maxPartitions) - log10(hasMaxPartitioner.getNumPartitions) &lt; 1  &#125;&#125;
-
-对于reduceByKey方法，当不传numPartitions参数时，其默认的分区器由defaultPartitioner()方法决定，分区器就决定了分区数。
-defaultPartitioner()的决定分区器规则总结如下：
-
-如果定义了”spark.default.parallelism”，则defaultNumPartitions &#x3D; “spark.default.parallelism” ；如果未定义，则defaultNumPartitions等于所有rdd分区中最大的分区数
-如果在所有rdd中有对应的partitioner，则选出分区数量最大的partitioner，并且该partitioner的分区数满足以下两个条件之一，则返回该partitioner作为API的partitioner
-分区数量是合理的
-分区数量大于defaultNumPartitions
-
-
-否则，返回HashPartitioner(defaultNumPartitions)
-
-总结，对于reduceByKey等类似的API而言，只要是通过defaultPartitioner()定义分区器的，其分区数量有三种情况：
-
-等于默认值spark.default.parallelism
-等于所有rdd中最大partition数量
-等于所有partitioner中最大partition数量
-
-也可以看出此类型的转换，partition数量总是趋向于变大，而”spark.default.parallelism”是个平衡点。
-如果定义了”spark.default.parallelism”：
-
-如果它定义的很小，对于没有分区器则分区数量很小。对于有分区器，defaultNumPartitions &lt; hasMaxPartitioner.get.getNumPartitions几乎永远为true，将保持最大分区器的分区数量，不会主动干预原来的分区情况。
-如果它定义的很大，对于没有分区器则分区数量很大。对于有分区器，defaultNumPartitions &lt; hasMaxPartitioner.get.getNumPartitions几乎永远为false，结果依赖于最大分区器的分区数量小于分区数量最大的rdd的程度，如果相差不大则保留原来的分区器，如果相差很大，则以”spark.default.parallelism”作为新分区大小。
-
-如果没定义”spark.default.parallelism”：
-
-对于没有分区器，则分区数量等于所有rdd中最大partition数量。
-对于有分区器，defaultNumPartitions &lt; hasMaxPartitioner.get.getNumPartitions永远为false，结果依赖于最大分区器的分区数小于分区数量最大的rdd的程度，如果相差不大则保留原来的分区器，如果相差很大，则以所有rdd的最大分区数为新分区大小。
-
-保持partitioner的transformation如上所述，rdd的parittioner是决定分区数量的重要因素，对于以下transformation 默认 将会保留和传播partitioner: 
-
-cogroup
-groupWith
-join
-leftOuterJoin
-rightOuterJoin
-groupByKey
-reduceByKey
-foldByKey
-combineByKey
-partitionBy
-mapValues 
-flatMapValues 
-filter
-
-其他transfermation将默认不保持分区器。因为其他操作（比如map）可能会修改key，修改了key后，原来的分区器就失去了它的意义。相反的，mapValues只修改value不修改key，所以其保留和传播分区器是合理的。
-参考https://github.com/rohgar/scala-spark-4/wiki/Partitioning
-
-TODO 通过文件创建rdd还未考虑，以后有时间加进来本文为学习过程中产生的总结，由于学艺不精可能有些观点或者描述有误，还望各位同学帮忙指正，共同进步。
-
-]]></content>
-      <tags>
-        <tag>spark</tag>
-        <tag>scala</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>android获取ip(webtrc-app)</title>
     <url>/2018/09/16/android%E8%8E%B7%E5%8F%96ip(webtrc-app).html</url>
     <content><![CDATA[Show your ip by webrtc代码: 链接
@@ -451,6 +451,180 @@ public static List&lt;String&gt; getIPAddress() &#123;    ArrayList&lt;String&gt
       <tags>
         <tag>android</tag>
         <tag>ip</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>effective go learning</title>
+    <url>/2018/09/16/effective-go-learning-1.html</url>
+    <content><![CDATA[Formmating：
+gofmt：针对文件进行格式化
+go fmt：针对包进行格式化
+
+IndentationWe use tabs for indentation（使用tab来缩进） and gofmt emits them by default. Use spaces only if you must.（仅在必要时使用空格）
+Line lengthGo has no line length limit. Don’t worry about overflowing a punched card. If a line feels too long, wrap it and indent with an extra tab.
+ParenthesesGo needs fewer parentheses（更少的括号） than C and Java: control structures (if, for, switch) do not have parentheses in their syntax. Also, the operator precedence hierarchy is shorter and clearer
+控制结构（if，for，switch）的语法中没有括号，使用严格的空格来提升直观感。
+Commentary：
+提供C模式的 &#x2F;* *&#x2F;的块注释，和C++模式的行注释，行注释更加普遍，而块模式在包注释以及大块注释的时候比较常用
+godoc会抽取注释成文档
+在顶级声明之前出现的注释（没有中间换行符）将与声明一起提取，以作为项目的解释性文本。
+每个包都应该有一个包注释，在package子句之前有一个块注释。对于多个文件的package，只需要在任意一个文件中声名包注释即可。包注释应该介绍包，并提供与整个包相关的信息。它将首先出现在godoc页面上。
+程序中的每个导出（大写）名称都应具有doc注释。并且最好以被声明的函数、字段或者其他作为开头。这样子用godoc时，容易搜索到对应的文档
+
+
+
+Names：package name：
+按照惯例，软件包被赋予 小写单字名称; 应该不需要下划线或者混合使用。如果包名冲突的话，可以使用别名引用
+包名是其 源目录的基本名称，包中src&#x2F;encoding&#x2F;base64 输入”encoding&#x2F;base64”，但是有名称base64，不是encoding_base64也不是encodingBase64
+使用package.New的形式定义实例函数
+
+Getters：
+使用与字段相同的方法（首字母大写）来命名getter
+使用Set+与字段相同的方法（首字母大写）来命名setter
+
+Interface names：
+一个方法接口由该方法name加上 er后缀或类似的修改命名：Reader， Writer，Formatter， CloseNotifier等。
+Read，Write，Close，Flush， String等有规范签名和意义。为避免混淆，请不要将您的方法作为其中一个名称，除非它具有相同的签名和含义。
+相反，如果您的类型实现的方法与众所周知类型的方法具有相同的含义，请为其指定相同的名称和签名;
+使用String调用你的字符串转换方法而不是ToString，即使用String而不是ToString
+
+MixedCaps：
+使用首字母大写的驼峰或者首字母小写的驼峰对多字名称进行命名
+而不是使用下划线
+
+Semicolons：
+与C语言一样使用分号对语句进行分割，不同的是大部分工作由词法分析器完成
+如果一行以 int、float64、数字或者字符串常量，或者为以下其中之一，则词法分析器会在此句末尾添加分号
+break continue fallthrough return ++ – ) }
+
+
+对于一个闭包来说，分号也可以省略
+在go中，一般只有for循环子句之类具有分号
+不能把控制结构的左括号（if，for，switch，或select）在下一行（因为放在下一行，词法分析器会自动加分号到行尾），如错误示范
+if i &lt; f() &#x2F;&#x2F; wrong!{ &#x2F;&#x2F; wrong!g()}
+
+
+
+Control structures：与C语言类似，不过没有do和while，只有for、if、switch、selectif：
+	
+
+if语句必须包含大括号，无论子句有多简单
+由于if和switch接受初始化语句，它经常可以看到一个用于设置一个局部变量用法
+由于在go中倾向于使用return来返回错误，所以在这种流程中不需要else子句
+
+Redeclaration and reassignment：
+再次声明和再次赋值需要注意三个方面
+
+再次声明是在相同的域下发生的（如果v已在外部声明中声明，这时声明将创建一个新变量§）（注释：在go中变量的作用域与传统语言比较类似，比如if语句中的变量为局部变量，而在python中，if语句中的变量不是局部变量，而是与if外部共享作用域和命名空间）
+初始化中的相应值可分配给v
+声明中至少有一个变量被新建，如果都已经被声明过，则应该使用 “&#x3D;”，而不是”:&#x3D;”，因为 “:&#x3D;” 的第一步是重新创建变量，如果变量均已经存在，则不需要重新创建新的变量，所以不能使用 “:&#x3D;”
+
+
+
+For：
+没有while和do-while
+
+三种形式
+
+for init; condition; post { } &#x2F;&#x2F; Like a C for
+for condition { } &#x2F;&#x2F; Like a C while
+for { } &#x2F;&#x2F; Like a C for(;;) or while(true)
+
+
+结合range对数组，切片，字符串，map，channel进行遍历
+
+range能够比较好的处理，utf-8类型的字符串，能够自动解码，同时应该使用 “%q” 占位符进行输出
+
+
+go中没有逗号运算
+
+++ 和 – 是一个声明，而不是一个表达式
+
+注意for的post中只允许一个表达式，所以如果想要在for中使用多个变量，你应该使用 并行赋值，如
+
+for i, j :&#x3D; 0, len(a)-1; i &lt; j; i, j &#x3D; i+1, j-1 {}
+所以也不能在post段使用 ++ 或者 –，因为post中需要一个表达式，但是这两个是声明。 应该说如果在post需要给两个变量赋值时，不能使用 ++ 或者 –
+
+
+
+Switch：
+case后面可以跟多个条件，用逗号分隔即可，如
+
+case ‘ ‘, ‘?’, ‘&amp;’, ‘&#x3D;’, ‘#’, ‘+’, ‘%’:
+
+
+与c不同的是，go的switch中的case子句并不会因为没有break就一直执行，而是只执行一个case
+
+并且switch中的break是为了提前结束case后的代码，从而跳转到switch语句块后
+
+如果switch外有for循环，则可以在for外增加label，break + label则在case中可以直接跳转到循环外。当然continue也可以使用label，但是只对loop有用
+
+
+Type switch：
+switch 也可以用来发现一个接口变量的动态类型。需要配合 type 关键字使用
+实际上声明了一个具有相同名称但在每种情况下具有不同类型的新变量，如
+
+var t interface&#123;&#125;t = functionOfSomeType()switch t := t.(type) &#123;      default:    fmt.Printf(&quot;unexpected type %T\n&quot;, t) // %T prints whatever type t has      case bool:    fmt.Printf(&quot;boolean %t\n&quot;, t) // t has type bool      case int:    fmt.Printf(&quot;integer %d\n&quot;, t) // t has type int      case *bool:    fmt.Printf(&quot;pointer to boolean %t\n&quot;, *t) // t has type *bool      case *int:    fmt.Printf(&quot;pointer to integer %d\n&quot;, *t) // t has type *int&#125;
+
+
+类型查询，就是根据变量，查询这个变量的类型。为什么会有这样的需求呢？goalng中有一个特殊的类型interface{}，这个类型可以被任何类型的变量赋值，如果想要知道到底是哪个类型的变量赋值给了interface{}类型变量，就需要使用类型查询来解决这个需求
+
+Functions：Multiple return values：
+可以返回多个值，避免了类似C的传指针到函数中才能该数值的方式
+
+Named result parameters：
+定义函数的返回值类型的时候，也可以指定变量名
+指定了变量名后，当函数开始时，将会根据它们的类型进行零值初始化，这时函数可以直接return不用添加任何值，会默认返回已经声明的返回变量
+
+Defer：
+在解锁互斥锁和关闭文件中最常用
+在函数返回前，立刻调用被声明为defer的函数
+如果被defer的函数有参数，那么 参数值为defer语句执行时参数的值，不会因为参数在后面的流程中被更改而导致defer函数的参数被修改
+如果有多个defer时，遵循“LIFO”后进先出的原则，入栈出栈
+
+Data：Allocation with new：
+go有两个分配语句，new和make
+new
+内建函数
+分配内存，但是不像其他语言一样初始化内存，而是仅仅用零值填充它
+new(T)在内存分配了一个零化的T，并返回T的指针 *T
+
+
+由于返回的内存new为零，因此需要零值的数据结构情况下，可以直接使用不用进一步的初始化
+零值有传递性
+
+type SyncedBuffer struct &#123;        lock sync.Mutex        buffer bytes.Buffer    &#125;    p := new(SyncedBuffer) // type *SyncedBuffer    var v SyncedBuffer // type SyncedBuffer    
+Constructors and composite literals:
+如果不用初始化结构体的内部字段，则 new(File) 等价于 &amp;File{}
+可以指定初始化File的某些字段，如 &amp;File{fd: fd, name: name}
+
+Allocation with make:
+与new相比，内置函数make(T, args)有不同的用途new(T)。它仅创建slice，maps和channels，并返回类型初始化（非零值）的T（不是*T）。
+有这样的区别的原因是，这三种类型的数据结构必须初始化了才能使用，比如slice必须初始化指向数组的指针、长度、容量，map和channel也是如此。
+比如，make([]int,10,100)，分配一个100个整数的数组，然后创建一个长度为10且容量为100的切片结构，指向数组的前10个元素。注意底层是申请cap大小的数组，而 c&#x3D;new([]int) 则返回一个指向新分配slice数据结构，虽然len和cap会初始化为0，*但是这个slice的指针指向nil，c &#x3D;&#x3D;nil 为true。
+以下例子解释了new和make的区别。
+
+var p *[]int = new([]int) // allocates slice structure; *p == nil; rarely usefulvar v []int = make([]int, 100) // the slice v now refers to a new array of 100 ints// Unnecessarily complex:var p *[]int = new([]int)*p = make([]int, 100, 100)// Idiomatic:v := make([]int, 100)
+
+Arrays:
+数组在Go和C中的工作方式有很大差异。在Go中，
+数组是值，不再是指针。将一个数组赋值给另一个数组会 复制所有元素。
+特别是，如果将数组传递给函数，它将接收数组的副本，而不是指向它的指针。
+数组的大小是其类型的一部分。类型[10]int 和[20]int不同
+
+
+当然可以用 &amp; 显式地取数组的地址，如
+
+func Sum(a *[3]float64) (sum float64) &#123;        for _, v := range *a &#123;                sum += v            &#125;            return    &#125;array := [...]float64&#123;7.0, 8.5, 9.1&#125;x := Sum(&amp;array) // Note the explicit address-of operator
+
+Slice:
+在go中，slice使用远远比array使用广泛。slice 持有对底层数组的引用，当一个切片赋值给另一个时，将会持有相同数组的引用。
+如果函数采用slice参数，则对切片元素所做的更改将对调用者可见，类似于将指针传递给基础数组。有疑问
+对于slice，经常需要Append配合使用，Append实现如下。之后我们必须返回切片，因为虽然Append可以修改切片的元素，但切片本身（运行时的数据结构包含指针，长度和容量）是按值传递的。
+
+func Append(slice, data []byte) []byte &#123;    l := len(slice)    if l + len(data) &gt; cap(slice) &#123;  // reallocate        // Allocate double what&#x27;s needed, for future growth.        newSlice := make([]byte, (l+len(data))*2)        // The copy function is predeclared and works for any slice type.        copy(newSlice, slice)        slice = newSlice    &#125;    slice = slice[0:l+len(data)]    copy(slice[l:], data)    return slice&#125;]]></content>
+      <tags>
+        <tag>go</tag>
       </tags>
   </entry>
   <entry>
@@ -679,208 +853,6 @@ flink run 中，一个作业的slot总数即为其最大的并行度，而每个
       </tags>
   </entry>
   <entry>
-    <title>gitlab ci &amp;&amp; docker-compose(1)-基础知识</title>
-    <url>/2018/09/27/gitlab-ci-docker-compose(1)-%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86.html</url>
-    <content><![CDATA[工作中需要使用到gitlab ci和docker-compose，而docker是这两者的前提。网上docker学习资料有很多，但是有一大部分是过时的，官网也有详细的文档，但是快速阅读起来比较慢，毕竟不是母语。之前学习的时候走了很多弯路，现把最近搜集到比较好的资料分享出来，希望对大家有帮助
-docker学习资料Docker — 从入门到实践（一个不错的docker入门教程，极力推荐）:
-
-https://github.com/yeasy/docker_practice
-https://docker_practice.gitee.io/
-
-Docker 问答录（100 问）：https://blog.lab99.org/post/docker-2016-07-14-faq.html
-dockerfile中：https://docs.docker.com/engine/reference/builder/
-dockerfile的最佳实践：https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
-docker之Dockerfile实践（以nginx为例，一步一步构建镜像）：http://www.cnblogs.com/jsonhc/p/7767669.html
-docker-compose学习资料docker-compose中的environment：https://docs.docker.com/compose/compose-file/#environment
-docker-compose中的变量：https://docs.docker.com/compose/compose-file/#variable-substitution
-docker-comppose中的变量的优先顺序：https://docs.docker.com/compose/environment-variables/
-Declare default environment variables in file：https://docs.docker.com/compose/env-file/
-ENTRYPOINT的shell模式的副作用：https://docs.docker.com/engine/reference/builder/#entrypoint
-vishnubob&#x2F;wait-for-it https://github.com/vishnubob/wait-for-it
-dockfile最佳实践：https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
-gitlab-ci学习资料这部分学习大部分都是官网，不做过多的分享，只留一个默认变量的链接
-ci的默认变量：https://docs.gitlab.com/ce/ci/variables/README.html
-]]></content>
-      <tags>
-        <tag>docker</tag>
-        <tag>gitlabci</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>effective go learning</title>
-    <url>/2018/09/16/effective-go-learning-1.html</url>
-    <content><![CDATA[Formmating：
-gofmt：针对文件进行格式化
-go fmt：针对包进行格式化
-
-IndentationWe use tabs for indentation（使用tab来缩进） and gofmt emits them by default. Use spaces only if you must.（仅在必要时使用空格）
-Line lengthGo has no line length limit. Don’t worry about overflowing a punched card. If a line feels too long, wrap it and indent with an extra tab.
-ParenthesesGo needs fewer parentheses（更少的括号） than C and Java: control structures (if, for, switch) do not have parentheses in their syntax. Also, the operator precedence hierarchy is shorter and clearer
-控制结构（if，for，switch）的语法中没有括号，使用严格的空格来提升直观感。
-Commentary：
-提供C模式的 &#x2F;* *&#x2F;的块注释，和C++模式的行注释，行注释更加普遍，而块模式在包注释以及大块注释的时候比较常用
-godoc会抽取注释成文档
-在顶级声明之前出现的注释（没有中间换行符）将与声明一起提取，以作为项目的解释性文本。
-每个包都应该有一个包注释，在package子句之前有一个块注释。对于多个文件的package，只需要在任意一个文件中声名包注释即可。包注释应该介绍包，并提供与整个包相关的信息。它将首先出现在godoc页面上。
-程序中的每个导出（大写）名称都应具有doc注释。并且最好以被声明的函数、字段或者其他作为开头。这样子用godoc时，容易搜索到对应的文档
-
-
-
-Names：package name：
-按照惯例，软件包被赋予 小写单字名称; 应该不需要下划线或者混合使用。如果包名冲突的话，可以使用别名引用
-包名是其 源目录的基本名称，包中src&#x2F;encoding&#x2F;base64 输入”encoding&#x2F;base64”，但是有名称base64，不是encoding_base64也不是encodingBase64
-使用package.New的形式定义实例函数
-
-Getters：
-使用与字段相同的方法（首字母大写）来命名getter
-使用Set+与字段相同的方法（首字母大写）来命名setter
-
-Interface names：
-一个方法接口由该方法name加上 er后缀或类似的修改命名：Reader， Writer，Formatter， CloseNotifier等。
-Read，Write，Close，Flush， String等有规范签名和意义。为避免混淆，请不要将您的方法作为其中一个名称，除非它具有相同的签名和含义。
-相反，如果您的类型实现的方法与众所周知类型的方法具有相同的含义，请为其指定相同的名称和签名;
-使用String调用你的字符串转换方法而不是ToString，即使用String而不是ToString
-
-MixedCaps：
-使用首字母大写的驼峰或者首字母小写的驼峰对多字名称进行命名
-而不是使用下划线
-
-Semicolons：
-与C语言一样使用分号对语句进行分割，不同的是大部分工作由词法分析器完成
-如果一行以 int、float64、数字或者字符串常量，或者为以下其中之一，则词法分析器会在此句末尾添加分号
-break continue fallthrough return ++ – ) }
-
-
-对于一个闭包来说，分号也可以省略
-在go中，一般只有for循环子句之类具有分号
-不能把控制结构的左括号（if，for，switch，或select）在下一行（因为放在下一行，词法分析器会自动加分号到行尾），如错误示范
-if i &lt; f() &#x2F;&#x2F; wrong!{ &#x2F;&#x2F; wrong!g()}
-
-
-
-Control structures：与C语言类似，不过没有do和while，只有for、if、switch、selectif：
-	
-
-if语句必须包含大括号，无论子句有多简单
-由于if和switch接受初始化语句，它经常可以看到一个用于设置一个局部变量用法
-由于在go中倾向于使用return来返回错误，所以在这种流程中不需要else子句
-
-Redeclaration and reassignment：
-再次声明和再次赋值需要注意三个方面
-
-再次声明是在相同的域下发生的（如果v已在外部声明中声明，这时声明将创建一个新变量§）（注释：在go中变量的作用域与传统语言比较类似，比如if语句中的变量为局部变量，而在python中，if语句中的变量不是局部变量，而是与if外部共享作用域和命名空间）
-初始化中的相应值可分配给v
-声明中至少有一个变量被新建，如果都已经被声明过，则应该使用 “&#x3D;”，而不是”:&#x3D;”，因为 “:&#x3D;” 的第一步是重新创建变量，如果变量均已经存在，则不需要重新创建新的变量，所以不能使用 “:&#x3D;”
-
-
-
-For：
-没有while和do-while
-
-三种形式
-
-for init; condition; post { } &#x2F;&#x2F; Like a C for
-for condition { } &#x2F;&#x2F; Like a C while
-for { } &#x2F;&#x2F; Like a C for(;;) or while(true)
-
-
-结合range对数组，切片，字符串，map，channel进行遍历
-
-range能够比较好的处理，utf-8类型的字符串，能够自动解码，同时应该使用 “%q” 占位符进行输出
-
-
-go中没有逗号运算
-
-++ 和 – 是一个声明，而不是一个表达式
-
-注意for的post中只允许一个表达式，所以如果想要在for中使用多个变量，你应该使用 并行赋值，如
-
-for i, j :&#x3D; 0, len(a)-1; i &lt; j; i, j &#x3D; i+1, j-1 {}
-所以也不能在post段使用 ++ 或者 –，因为post中需要一个表达式，但是这两个是声明。 应该说如果在post需要给两个变量赋值时，不能使用 ++ 或者 –
-
-
-
-Switch：
-case后面可以跟多个条件，用逗号分隔即可，如
-
-case ‘ ‘, ‘?’, ‘&amp;’, ‘&#x3D;’, ‘#’, ‘+’, ‘%’:
-
-
-与c不同的是，go的switch中的case子句并不会因为没有break就一直执行，而是只执行一个case
-
-并且switch中的break是为了提前结束case后的代码，从而跳转到switch语句块后
-
-如果switch外有for循环，则可以在for外增加label，break + label则在case中可以直接跳转到循环外。当然continue也可以使用label，但是只对loop有用
-
-
-Type switch：
-switch 也可以用来发现一个接口变量的动态类型。需要配合 type 关键字使用
-实际上声明了一个具有相同名称但在每种情况下具有不同类型的新变量，如
-
-var t interface&#123;&#125;t = functionOfSomeType()switch t := t.(type) &#123;      default:    fmt.Printf(&quot;unexpected type %T\n&quot;, t) // %T prints whatever type t has      case bool:    fmt.Printf(&quot;boolean %t\n&quot;, t) // t has type bool      case int:    fmt.Printf(&quot;integer %d\n&quot;, t) // t has type int      case *bool:    fmt.Printf(&quot;pointer to boolean %t\n&quot;, *t) // t has type *bool      case *int:    fmt.Printf(&quot;pointer to integer %d\n&quot;, *t) // t has type *int&#125;
-
-
-类型查询，就是根据变量，查询这个变量的类型。为什么会有这样的需求呢？goalng中有一个特殊的类型interface{}，这个类型可以被任何类型的变量赋值，如果想要知道到底是哪个类型的变量赋值给了interface{}类型变量，就需要使用类型查询来解决这个需求
-
-Functions：Multiple return values：
-可以返回多个值，避免了类似C的传指针到函数中才能该数值的方式
-
-Named result parameters：
-定义函数的返回值类型的时候，也可以指定变量名
-指定了变量名后，当函数开始时，将会根据它们的类型进行零值初始化，这时函数可以直接return不用添加任何值，会默认返回已经声明的返回变量
-
-Defer：
-在解锁互斥锁和关闭文件中最常用
-在函数返回前，立刻调用被声明为defer的函数
-如果被defer的函数有参数，那么 参数值为defer语句执行时参数的值，不会因为参数在后面的流程中被更改而导致defer函数的参数被修改
-如果有多个defer时，遵循“LIFO”后进先出的原则，入栈出栈
-
-Data：Allocation with new：
-go有两个分配语句，new和make
-new
-内建函数
-分配内存，但是不像其他语言一样初始化内存，而是仅仅用零值填充它
-new(T)在内存分配了一个零化的T，并返回T的指针 *T
-
-
-由于返回的内存new为零，因此需要零值的数据结构情况下，可以直接使用不用进一步的初始化
-零值有传递性
-
-type SyncedBuffer struct &#123;        lock sync.Mutex        buffer bytes.Buffer    &#125;    p := new(SyncedBuffer) // type *SyncedBuffer    var v SyncedBuffer // type SyncedBuffer    
-Constructors and composite literals:
-如果不用初始化结构体的内部字段，则 new(File) 等价于 &amp;File{}
-可以指定初始化File的某些字段，如 &amp;File{fd: fd, name: name}
-
-Allocation with make:
-与new相比，内置函数make(T, args)有不同的用途new(T)。它仅创建slice，maps和channels，并返回类型初始化（非零值）的T（不是*T）。
-有这样的区别的原因是，这三种类型的数据结构必须初始化了才能使用，比如slice必须初始化指向数组的指针、长度、容量，map和channel也是如此。
-比如，make([]int,10,100)，分配一个100个整数的数组，然后创建一个长度为10且容量为100的切片结构，指向数组的前10个元素。注意底层是申请cap大小的数组，而 c&#x3D;new([]int) 则返回一个指向新分配slice数据结构，虽然len和cap会初始化为0，*但是这个slice的指针指向nil，c &#x3D;&#x3D;nil 为true。
-以下例子解释了new和make的区别。
-
-var p *[]int = new([]int) // allocates slice structure; *p == nil; rarely usefulvar v []int = make([]int, 100) // the slice v now refers to a new array of 100 ints// Unnecessarily complex:var p *[]int = new([]int)*p = make([]int, 100, 100)// Idiomatic:v := make([]int, 100)
-
-Arrays:
-数组在Go和C中的工作方式有很大差异。在Go中，
-数组是值，不再是指针。将一个数组赋值给另一个数组会 复制所有元素。
-特别是，如果将数组传递给函数，它将接收数组的副本，而不是指向它的指针。
-数组的大小是其类型的一部分。类型[10]int 和[20]int不同
-
-
-当然可以用 &amp; 显式地取数组的地址，如
-
-func Sum(a *[3]float64) (sum float64) &#123;        for _, v := range *a &#123;                sum += v            &#125;            return    &#125;array := [...]float64&#123;7.0, 8.5, 9.1&#125;x := Sum(&amp;array) // Note the explicit address-of operator
-
-Slice:
-在go中，slice使用远远比array使用广泛。slice 持有对底层数组的引用，当一个切片赋值给另一个时，将会持有相同数组的引用。
-如果函数采用slice参数，则对切片元素所做的更改将对调用者可见，类似于将指针传递给基础数组。有疑问
-对于slice，经常需要Append配合使用，Append实现如下。之后我们必须返回切片，因为虽然Append可以修改切片的元素，但切片本身（运行时的数据结构包含指针，长度和容量）是按值传递的。
-
-func Append(slice, data []byte) []byte &#123;    l := len(slice)    if l + len(data) &gt; cap(slice) &#123;  // reallocate        // Allocate double what&#x27;s needed, for future growth.        newSlice := make([]byte, (l+len(data))*2)        // The copy function is predeclared and works for any slice type.        copy(newSlice, slice)        slice = newSlice    &#125;    slice = slice[0:l+len(data)]    copy(slice[l:], data)    return slice&#125;]]></content>
-      <tags>
-        <tag>go</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>gitlab ci &amp;&amp; docker-compose(2)-dockerfile的使用</title>
     <url>/2018/09/16/gitlab-ci-docker-compose(2)-dockerfile%E7%9A%84%E4%BD%BF%E7%94%A8.html</url>
     <content><![CDATA[dockerfileCOPY VS. ADD
@@ -958,6 +930,429 @@ docker run –entrypoint如何添加参数：https://docs.docker.com/engine/refe
       <tags>
         <tag>docker</tag>
         <tag>gitlabci</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>gitlab ci &amp;&amp; docker-compose(1)-基础知识</title>
+    <url>/2018/09/27/gitlab-ci-docker-compose(1)-%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86.html</url>
+    <content><![CDATA[工作中需要使用到gitlab ci和docker-compose，而docker是这两者的前提。网上docker学习资料有很多，但是有一大部分是过时的，官网也有详细的文档，但是快速阅读起来比较慢，毕竟不是母语。之前学习的时候走了很多弯路，现把最近搜集到比较好的资料分享出来，希望对大家有帮助
+docker学习资料Docker — 从入门到实践（一个不错的docker入门教程，极力推荐）:
+
+https://github.com/yeasy/docker_practice
+https://docker_practice.gitee.io/
+
+Docker 问答录（100 问）：https://blog.lab99.org/post/docker-2016-07-14-faq.html
+dockerfile中：https://docs.docker.com/engine/reference/builder/
+dockerfile的最佳实践：https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
+docker之Dockerfile实践（以nginx为例，一步一步构建镜像）：http://www.cnblogs.com/jsonhc/p/7767669.html
+docker-compose学习资料docker-compose中的environment：https://docs.docker.com/compose/compose-file/#environment
+docker-compose中的变量：https://docs.docker.com/compose/compose-file/#variable-substitution
+docker-comppose中的变量的优先顺序：https://docs.docker.com/compose/environment-variables/
+Declare default environment variables in file：https://docs.docker.com/compose/env-file/
+ENTRYPOINT的shell模式的副作用：https://docs.docker.com/engine/reference/builder/#entrypoint
+vishnubob&#x2F;wait-for-it https://github.com/vishnubob/wait-for-it
+dockfile最佳实践：https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
+gitlab-ci学习资料这部分学习大部分都是官网，不做过多的分享，只留一个默认变量的链接
+ci的默认变量：https://docs.gitlab.com/ce/ci/variables/README.html
+]]></content>
+      <tags>
+        <tag>docker</tag>
+        <tag>gitlabci</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>gitlab ci &amp;&amp; docker-compose(3)-mysql的初始化</title>
+    <url>/2018/09/18/gitlab-ci-docker-compose(3)-mysql%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96.html</url>
+    <content><![CDATA[mysql 容器初始化：
+根据官方文档可以使用docker启动时bind主机包含sql、sh文件的目录到容器&#x2F;docker-entrypoint-initdb.d&#x2F;目录，在使用mysql镜像启动容器时会自动读取该文件夹下的内容对数据库初始化。可以使用以下两种方式在命令行启动，在低版本中可能只支持-v选项，在docker 17.03.0-ce版本(不含)以上支持–mount选项。
+
+--mount选项sudo docker run -it --name=mysql_db --mount type=bind,src=/home/zhang/Workspace/go/src/app/init_sql_script/,dst=/docker-entrypoint-initdb.d/ -e MYSQL_ROOT_PASSWORD=test -d mysql:5.7.22-v选项sudo docker run -it --name=mysql_db -v /home/zhang/Workspace/go/src/app/init_sql_script/:/docker-entrypoint-initdb.d/ -e MYSQL_ROOT_PASSWORD=test -d mysql:5.7.22
+
+
+另外一种方法使用dockerfile的方式。直接在dockerfile中复制相应的sql,sh文件到&#x2F;docker-entrypoint-initdb.d&#x2F;目录下，再根据dockerfile build出对应的镜像，docker run的时候也会直接初始化对应的数据。
+
+# DockerfileMySQLFROM mysql:5.7.22COPY ./init_sql_script/ /docker-entrypoint-initdb.d/
+
+sudo docker build -t app_mysql_db:init-data . sudo docker run --name=app_mysql_db app_mysql_db:init-data
+
+docker-compose启动容器组：
+
+
+可以使用docker-compose启动容器组，先写好 docker-compose.yml后，在build和run。
+
+# docker-compose.ymlversion: &#x27;3&#x27;services:  app:    build:      context: .      dockerfile: DockerfileAPP    image: app:latest    ports:      - &quot;127.0.0.1:8080:8080&quot;    depends_on:      - mysql_db    command: app start  mysql_db:    #build:    #  context: .    #  dockerfile: DockerfileMySQL    #image: mysql_db:latest    image: &quot;mysql:5.7.22&quot;    environment:      - MYSQL_ROOT_PASSWORD=test    expose:      - &quot;3306&quot;    volume:      - ./init_sql_script/:/docker-entrypoint-initdb.d/
+
+sudo docker-compose build sudo docker-compose up --force-recreate
+
+gitlab ci 启动容器组:
+gitlab ci 对于使用bind(–monut or -v)方式初始化数据库有还未有很好的支持。在gitlab ci中使用docker-compose中启动容器组时，docker-compose.yml中使用bind模式时不能成功初始化数据。如果docker-compose.yml使用dockerfile的方式则能够初始化数据。
+
+参考:
+mysql官方docker说明 https://hub.docker.com/_/mysql/
+Introduce relative entrypoints and start services after project clone and checkouthttps://gitlab.com/gitlab-org/gitlab-runner/issues/3210
+MIGRATING TO GITLAB CI SERVICEShttps://www.mariocarrion.com/2017/10/16/gitlab-ci-services.html
+gitlab ci: mysql build and restore db dumphttps://stackoverflow.com/questions/44009941/gitlab-ci-mysql-build-and-restore-db-dump
+]]></content>
+      <tags>
+        <tag>docker</tag>
+        <tag>gitlabci</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>gitlab ci &amp;&amp; docker-compose(4)-mysql的添加权限</title>
+    <url>/2018/09/20/gitlab-ci-docker-compose(4)-mysql%E7%9A%84%E6%B7%BB%E5%8A%A0%E6%9D%83%E9%99%90.html</url>
+    <content><![CDATA[目前网上添加msyql用户和权限时，很多都是使用INSERT, UPDATE, DELETE 直接操作权限表，并且总结得参差不齐。根据官方网站应该使用 CREATE USER 语句创建用户，使用 GRANT 语句添加权限。
+
+在mysql:5.7.22中需要配合 &#x2F;docker-entrypoint-initdb.d&#x2F; 目录初始化数据，这时可以在该目录的sql中可以添加权限的配置。
+
+ -- 不应该在这里直接删除&#x27;root&#x27;@&#x27;%&#x27;，否则会影响原本root应有的权限。可以通过该命令查看该命令的影响，SHOW GRANTS FOR &#x27;root&#x27;@&#x27;%&#x27;; -- 如果不删用户root，会出现该权限 GRANT ALL PRIVILEGES ON *.* to &#x27;root&#x27;@&#x27;%&#x27; WITH GRANT OPTION -- 如果删了用户root，会出现该权限 GRANT USAGE ON *.* to &#x27;root&#x27;@&#x27;%&#x27; -- drop user &#x27;root&#x27;@&#x27;%&#x27;; -- 密码在启动mysql容器或者在docker-compose.yml文件中时就应该指定，如 -- docker run -e MYSQL_ROOT_PASSWORD=test mysql:5.7.22 -- 或 -- environment: --     - MYSQL_ROOT_PASSWORD=test -- CREATE USER &#x27;root&#x27;@&#x27;%&#x27; IDENTIFIED BY &#x27;test&#x27;;GRANT ALL PRIVILEGES ON YOU_DATABASE.* TO &#x27;root&#x27;@&#x27;%&#x27;;
+
+
+当然建库建表前应该用if判断，不判断也行，因为本来就是新实例。
+
+DROP DATABASE IF EXISTS YOUR_DATABASE;CREATE DATABASE YOUR_DATABASE;USE YOUR_DATABASE;CREATE TABLE `your_table` () ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT=&#x27;必要的注释&#x27;;
+
+
+查看权限
+
+SHOW GRANTS FOR &#x27;root&#x27;@&#x27;%&#x27;;
+
+docker-compose up命令运行docker-compose up时，如果以前未创建相应的镜像，则默认会创建镜像并且根据该镜像启动container；如果以前创建过镜像，则判断当前是否有对应的container，如果有则直接启动，如果没有则创建对应的container；
+
+–build  Build images before starting containers.
+
+–build，加了这个选项后，每次运行 docker-compose up 都会构建镜像。构建镜像有另外一个专门的命令docker-compose build，可以使用–build-arg key&#x3D;val 传入编译时参数，如下则为 –build-arg X&#x3D;3 –build-arg Y&#x3D;4。传入到docker-compose后，再传到dockerfile的 ARG 声明的同名变量中，
+
+
+
+# docker-compose.ymlversion: &#x27;3&#x27;services:    app:        build:            context: .            dockerfile: docker/dockerfile            args:                X: $&#123;X:-1&#125; #如果X不传，则X为1                Y: $&#123;Y:-2&#125; #如果Y不传，则Y为2# dockerfileFROM some-image# 包含编译时默认值ARG X=1ARG Y=gitlabci# 编译时不包含默认值#ARG X#ARG Y# 设置容器内部环境变量ENV X=$XENV Y=$Y
+
+
+–force-recreate  Recreate containers even if their configuration and image haven’t changed.
+–force-recreate，加了这个选项后，docker-compose会重新创建container，即使与它对应的镜像没有变化
+
+
+-V, –renew-anon-volumes   Recreate anonymous volumes instead of retrievingdata from the previous containers.
+1.22.0版本有这个选项，某些低版本的不存在该选项
+仅在启动的容器已经被创建的情况下有意义
+从字面上来看，使用该选项运行docker-compose up 启动容器时，将会不使用复用上一个container的volume，而是重新创建对应的volume。如果不使用该选项，而是只加了–force-recreate也将仅仅会重新创建对应的容器，而不会重新mount根据对应目录而创建的volume。这个可以通过docker inpsect containter_name命令验证，两次运行docker-compose –build –force-recreate所创建的容器对应的volume的name依然相同。
+这个选项的存在的意义是，如果加了改选项，第一次启动容器的时候，mount对应的目录的文件有误，想stop掉当前的container，并且在对应的目录添加了对应的文件后，第二次启动容器时能够重新mount对应的文件夹，使容器读取正确对应的文件；如果不加改选项，则使用上一个container的volume，不能读取正确的文件
+当然，也可以不使用该命令，只要不是重启container的场景即可，什么意思呢，可以先 docker-compose rm -v contaner_name，下次docker-compose up的时候就是创建新容器了，当然也会重新挂载对应的volume。目前低版本的docker-comopose就是这么做的。
+之前在mysql:5.7.22 版本的docker容器在使用&#x2F;docker-entrypoint-initdb.d&#x2F; 目录初始化数据时，遇到类似的问题，踩了很多坑。
+
+
+总结，docker-compose up 与 docker start 命令更相似，因为它们都会复用之前的container（如果存在），而docker run是总会创建新的container。这要点需要牢记，才能避免踩坑。
+
+参考:
+Mysql官网 https://dev.mysql.com/doc/refman/5.7/en/adding-users.html
+]]></content>
+      <tags>
+        <tag>docker</tag>
+        <tag>gitlabci</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>gitlab ci &amp;&amp; docker-compose(5)-容器启动环境变量传递</title>
+    <url>/2018/09/25/gitlab-ci-docker-compose(5)-%E5%AE%B9%E5%99%A8%E5%90%AF%E5%8A%A8%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%E4%BC%A0%E9%80%92.html</url>
+    <content><![CDATA[docker run和docker-compose启动容器环境变量传递dockrfile中的ENV和CMD的关系（不考虑ENTRYPOINT）
+docker run使用默认命令 &amp;&amp; dockerfile中 ENV VERSION&#x3D;100, CMD [“echo”,”$VERSION”]：输出空
+
+docker run使用默认命令 &amp;&amp; dockrfile中 ENV VERSION&#x3D;100，CMD [“sh”,”-c”,”echo”,”$VERSION”]：输出空
+
+docker run使用默认命令 &amp;&amp; dockrfile中 ENV VERSION&#x3D;100，CMD [“sh”,”-c”,”echo $VERSION”]：输出100
+
+docker run使用默认命令 &amp;&amp; dockrfile中 ENV VERSION&#x3D;100，CMD echo $VERSION：输出100
+
+
+小结：docker run使用默认命令中要读取容器内部的环境变量的话，一定要使用后两种方式。并且需要记住的是，使用默认命令的情况下主机的环境变量不会影响container的变量，比如在root的shell下执行export VERSION&#x3D;101，对以上四个结果都不会有影响
+docke run使用指定命令执行与shell环境变零的关系docke run使用指定命令，docker run image_name echo $VERSION：则输出本地shell的VERSION变量，这个VERSION变量跟container一点关系都没有，完全取决于当前shell的环境变量。需要注意的是，由于docker run时一般是在root权限下，所以执行export VERSION=xxx 时，请先执行su -，避免因为使用sudo改变了实际的shell导致不能输出。
+
+
+docker-compose中的environment和dockerfile中CMD的关系（dockerfile不考虑ENTRYPOINT，docke-compose不指定command和entrypoint）由前面可知，要在CMD使用环境变量，必须是 [&quot;sh&quot;,&quot;-c&quot;,&quot;echo $VERSION&quot;] 或 echo $VERSION 模式，其他几个不再解释。
+
+docker-compose.yml不指定enviroment &amp;&amp; dockerfile中 ENV VERSION&#x3D;100, CMD [“sh”,”-c”,”echo $VERSION”]: 输出100
+
+docker-compose.yml指定enviroment: ${VERSION:-200} &amp;&amp; dockerfile中 ENV VERSION&#x3D;100, CMD [“sh”,”-c”,”echo $VERSION”]: 输出200
+
+docker-compose.yml指定enviroment: ${VERSION:-200} &amp;&amp; dockerfile中 ENV VERSION&#x3D;100, CMD [“sh”,”-c”,”echo $VERSION”] &amp;&amp; su - 下执行 export VERSION&#x3D;300: 输出300
+
+
+小结：在docker-compose模式下，shell环境变量优先于默认变量（此例中默认变量为200），docker-compose.yml中的environment变量优先于dockerfile中的ENV。其实docker-compose.yml中enviroment中的变量，会在docker-compose up的时候会创建或覆盖容器对应的环境变量，所以导致容器启动时它的优先级高于dockerfile中的ENV。
+对于docker-compose指定command的情况与 ‘docke run使用指定命令执行与shell环境变零的关系’一致，不再举例。
+善用 docker-compose config 查看解析后的yml是怎样的。
+更多参考：
+dockerfile中的cmd：https://docs.docker.com/engine/reference/builder/#cmd
+dockerfile的最佳实践：https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
+docker build传入多个编译时变量：https://stackoverflow.com/questions/42297387/docker-build-with-build-arg-with-multiple-arguments
+docker-compose中的environment：https://docs.docker.com/compose/compose-file/#environment
+docker-compose中的变量：https://docs.docker.com/compose/compose-file/#variable-substitution
+docker-comppose中的变量的优先顺序：https://docs.docker.com/compose/environment-variables/
+Declare default environment variables in file：https://docs.docker.com/compose/env-file/
+ENTRYPOINT的shell模式的副作用：https://docs.docker.com/engine/reference/builder/#entrypoint
+]]></content>
+      <tags>
+        <tag>docker</tag>
+        <tag>gitlabci</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>gitlab ci &amp;&amp; docker-compose(6)-容器启动先后顺序</title>
+    <url>/2018/09/26/gitlab-ci-docker-compose(6)-%E5%AE%B9%E5%99%A8%E5%90%AF%E5%8A%A8%E5%85%88%E5%90%8E%E9%A1%BA%E5%BA%8F.html</url>
+    <content><![CDATA[docker-compose容器启动先后顺序问题App应用程序容器需要连接一个mysql容器，使用docker-compose启动容器组，应该怎么做？在docker-compose中，容器A依赖容器B，B容器会先启动，然后再启动A容器，但是B容器不一定初始化完毕对外服务。
+先来看一段mysql官方对于这种问题的两段说明
+
+No connections until MySQL init completes
+
+If there is no database initialized when the container starts, then a default database will be created. While this is the expected behavior, this means that it will not accept incoming connections until such initialization completes. This may cause issues when using automation tools, such as docker-compose, which start several containers simultaneously.
+If the application you’re trying to connect to MySQL does not handle MySQL downtime or waiting for MySQL to start gracefully, then a putting a connect-retry loop before the service starts might be necessary. For an example of such an implementation in the official images, see WordPress or Bonita.
+
+
+所以一般有两种方法解决类似的问题
+
+程序层面改进，程序连接mysql部分需要有重连机制
+连接容器改进，在shell命令中判断mysql容器是否启动，如果未启动设定时间等待，如果启动了再启动应用程序
+
+这里只说明第二种方法
+使用wait-for-it.sh# docker-compose.ymlversion: &#x27;3&#x27;services:  app:    build:      context: .      dockerfile: DockerfileAPP    image: app:latest    ports:      - &quot;127.0.0.1:8080:8080&quot;    depends_on:      - mysql_db    command: /go/src/app/wait-for-it.sh mysql_db:3306 -s -t 30 -- /go/src/app/app-release start  mysql_db:    #build:    #  context: .    #  dockerfile: DockerfileMySQL    #image: mysql_db:latest    image: &quot;mysql:5.7.22&quot;    environment:      - MYSQL_ROOT_PASSWORD=test    expose:      - &quot;3306&quot;    volume:      - ./init_sql_script/:/docker-entrypoint-initdb.d/
+
+注意这行代码
+
+command: &#x2F;go&#x2F;src&#x2F;app&#x2F;wait-for-it.sh mysql_db:3306 -s -t 30 – &#x2F;go&#x2F;src&#x2F;app&#x2F;app-release start
+
+-s 表示如果没有检测到host为mysql_db的3306端口，则不执行后面的命令；-t 30表示超时时间为30秒，更多配置见参考。wait-for-it.sh可以使用多次，比如需要等待msyql和redis，可以这么写command: /go/src/app/wait-for-it.sh mysql_db:3306 -s -t 30 -- command: /go/src/app/wait-for-it.sh redis:6379 -s -t 30 -- /go/src/app/app-release start
+参考：
+mysql官方docker说明：https://hub.docker.com/_/mysql/
+Control startup order in Compose：https://docs.docker.com/compose/startup-order/
+vishnubob&#x2F;wait-for-it：https://github.com/vishnubob/wait-for-it
+Docker-compose check if mysql connection is ready：https://stackoverflow.com/questions/42567475/docker-compose-check-if-mysql-connection-is-ready
+]]></content>
+      <tags>
+        <tag>docker</tag>
+        <tag>gitlabci</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>go系列-中间件</title>
+    <url>/2018/09/29/go%E7%B3%BB%E5%88%97-%E4%B8%AD%E9%97%B4%E4%BB%B6.html</url>
+    <content><![CDATA[go中间件最近看代码看到go中间件的代码，遂搜相关代码以及类似的框架进行学习 
+什么是中间件
+了解中间件前需要了解 ServeMux、DefaultServeMux、http.Handler、http.HandlerFunc、mux.HandleFunc、ServeHTTP 等相关知识和它们之间的关系[推荐]https://www.alexedwards.net/blog/a-recap-of-request-handling
+
+context能做什么https://blog.questionable.services/article/map-string-interface/
+
+
+gorilla系列 &amp; Negroni
+Go实战–Golang中http中间件(goji&#x2F;httpauth、urfave&#x2F;negroni、gorilla&#x2F;handlers、justinas&#x2F;alice)https://blog.csdn.net/wangshubo1989/article/details/79227443
+
+Go实战–Gorilla web toolkit使用之gorilla&#x2F;handlershttps://blog.csdn.net/wangshubo1989/article/details/78970282
+
+Go实战–Gorilla web toolkit使用之gorilla&#x2F;contexthttps://blog.csdn.net/wangshubo1989/article/details/78910935
+
+gorilla&#x2F;mux https://github.com/gorilla/mux (需要着重看一下 文中的Graceful Shutdown和 https://github.com/gorilla/mux#graceful-shutdown）
+
+Negroni https://github.com/urfave/negroni
+
+
+[代码学习](https://github.com/salmon7/go-learning/tree/master/middle
+justinas&#x2F;alice&#x2F;&#x2F; TO-DO
+]]></content>
+      <tags>
+        <tag>go</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>golang数据库连接broken pipe异常原因分析及解决</title>
+    <url>/2019/11/10/golang%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5broken-pipe%E5%BC%82%E5%B8%B8%E5%8E%9F%E5%9B%A0%E5%88%86%E6%9E%90%E5%8F%8A%E8%A7%A3%E5%86%B3.html</url>
+    <content><![CDATA[
+在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver&#x2F;mysql，该包是按照go官方包database&#x2F;sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。
+
+线上场景目前 项目A 使用的go-sql-driver&#x2F;mysql版本为 3654d25ec346ee8ce71a68431025458d52a38ac0 ， 项目B 使用的版本为 v1.3.0 ，其中 项目A 的版本低于v1.3.0。它们线上标准错误输出都有类似以下的日志，但是程序的业务逻辑却没有影响。
+[mysql] 2019/08/01 17:12:18 packets.go:33: unexpected EOF[mysql] 2019/08/01 17:12:18 packets.go:130: write tcp 127.0.0.1:59722-&gt;127.0.0.1:3306: write: broken pipe
+
+通过日志输出以及堆栈可以找到 go-sql-driver/mysql/packets.go 对应的源码，可以发现第一条日志是以下第8行代码打印，第二条是第9行调用mc.Close()关闭连接时报错。
+// Read packet to buffer &#x27;data&#x27;func (mc *mysqlConn) readPacket() ([]byte, error) &#123;    var prevData []byte    for &#123;        // read packet header        data, err := mc.buf.readNext(4)        if err != nil &#123;            errLog.Print(err)            mc.Close()            return nil, driver.ErrBadConn        &#125;     // 省略部分代码&#125;
+
+问题复现
+通过网上搜索能够大概猜出是mysql server主动关闭的原因，我们可以通过设置mysql server主动关闭连接来复现线上场景，并且通过tcpdump观察其原因。
+
+1.设置mysql server主动关闭连接时间mysql server默认设置的关闭不活跃连接时间为28800秒（8小时），我们通过 set global wait_time=10 设置为10秒，便于问题重现。
+2.运行tcpdump和测试demo1.通过tcpdump可以收集tcp数据包的发送接收情况，尤其是的在mysql server关闭连接后，go程序如何和mysql server交互是我们关注的重点，tcpdump命令如下：
+sudo tcpdump -s 0 -t -i lo -l port 3306 -w lo.cap
+2.运行一个简单的测试demo
+package mainimport (    &quot;database/sql&quot;    &quot;log&quot;    &quot;time&quot;    _ &quot;github.com/go-sql-driver/mysql&quot;)func main() &#123;    // before you run this test program, please run the script in your mysql    // &quot;set global wait_timeout=10;&quot;    // 表示mysql server关闭不活跃连接的等待时间    // 参考 https://github.com/go-sql-driver/mysql/issues/657    db, err := sql.Open(&quot;mysql&quot;, &quot;root:zhang@tcp(127.0.0.1:3306)/?charset=latin1&amp;autocommit=1&amp;parseTime=true&amp;loc=Local&amp;timeout=3s&quot;)    if err != nil &#123;        log.Fatal(err)    &#125;    defer db.Close()    //db.SetConnMaxLifetime(5 * time.Second)    err = db.Ping()    if err != nil &#123;        log.Fatal(err)    &#125;    go func() &#123;        for &#123;            _, err := db.Exec(&quot;select * from test_time.A&quot;)            if err != nil &#123;                log.Fatal(err)            &#125;            // Wait for 11 seconds. This should be enough to timeout the conn, since `wait_timeout` is 10s            time.Sleep(11 * time.Second)        &#125;    &#125;()    time.Sleep(1000 * time.Second)&#125;
+
+
+
+3.分析tcp数据包通过wireshark打开lo.cap文件可以更加直观观察其交互情况，截图如下二图：
+可以看到10秒的第222号数据包中，mysql server发送的FIN信号并且收到了golang程序第223号的ack后，进入到tcp连接中FIN_WAIT_2状态，golang程序则进入到CLOSE_WAIT状态，此时mysql server不再接受任何查询请求。同时由于golang程序应用层无法感知mysql server关闭了连接，在11秒第224号的数据包中依然向mysql server发送了查询请求，mysql server应用层发现错误，直接返回重置连接。应用程序也打印出对应的日志。
+小结通过复现和分析，可知根本原因是golang尝试去使用一个被mysql server主动关闭的连接。通过代码堆栈分析，还分析出unexpected EOF是发送查询给mysql server后读取返回结果报错，而write tcp 127.0.0.1:59722-&gt;127.0.0.1:3306: write: broken pipe则是读取结果报错后尝试关闭连接时失败的报错。
+mysql server连接和golang数据库连接池的复用时间
+通过上一节，基本能确定是mysql server主动关闭连接的原因导致的，那么mysql server的 wait_timeout具体的定义和golang怎么解决这种问题的？对我们的业务有无影响？
+
+1.mysql连接复用时间mysql server在一定时间后将自动关闭不活跃连接。这个时间由wait_timeout决定，表示mysql server关闭 不活跃 连接的等待时间。wait_timeout配置官方说明如下。
+wait_timeout: The number of seconds the server waits for activity on a noninteractive connection before closing it.https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_wait_timeout
+
+2.golang数据库连接池复用时间go的默认连接池不会自动关闭连接，除非通过 DB.SetConnMaxLifetime() 设置了连接最长的时间，一般建议该配置远小于mysql server的wait_timeout。
+// SetConnMaxLifetime sets the maximum amount // of time a connection may be reused.//// Expired connections may be closed lazily before reuse.//// If d &lt;= 0, connections are reused forever.func (db *DB) SetConnMaxLifetime(d time.Duration)
+
+如果某个连接已经被mysql server关闭，而go程序无法感知，在复用该数据库连接时则会输出上述的错误日志。目前 项目A 和 项目B 的mysql驱动版本将这种错误情况返回 driver.ErrBadConn。
+3.对业务的影响
+这种mysql server主动关闭连接的情况，对我们的业务有没影响？
+
+go的官方 database/sql 包会对返回 driver.ErrBadConn 的错误进行重试，这点可以通过看源码 database/sql/sql.go 验证。可以看到只要驱动包返回了drvier.ErrBadConn，那么就会进行重试2次。因此如果第一次执行失败了，那么还会进行重试，所以最终对业务不会有影响，只是标准错误输出有对应的日志输出。
+// maxBadConnRetries is the number of maximum retries if the driver returns// driver.ErrBadConn to signal a broken connection before forcing a new// connection to be opened.const maxBadConnRetries = 2// ExecContext executes a query without returning any rows.// The args are for any placeholder parameters in the query.func (db *DB) ExecContext(ctx context.Context, query string, args ...interface&#123;&#125;) (Result, error) &#123;    var res Result    var err error    for i := 0; i &lt; maxBadConnRetries; i++ &#123;        res, err = db.exec(ctx, query, args, cachedOrNewConn)        if err != driver.ErrBadConn &#123;            break        &#125;    &#125;    if err == driver.ErrBadConn &#123;        return db.exec(ctx, query, args, alwaysNewConn)    &#125;    return res, err&#125;
+
+
+解决方案
+测试demo见问题复现章节
+
+解决方案一：更新mysql驱动到目前最新release版本-v1.4.1目前最新release的版本v1.4.1包含了修改以前 激进重试策略 的提交（代码修改逻辑见 commit），将 许多 情况下从返回 driver.ErrBadConn 改为返回 ErrInvalidConn，减少滥用官方sql包的重试逻辑。本章讨论的mysql server主动关闭连接也在此次修改中。
+跟踪源代码调用栈发现，由于连接为非阻塞socket，在mysql server关闭连接后，go-sql-driver/mysql还能继续write数据到socket的buffer中，并且不会立即返回错误。在go-sql-driver/mysql读取返回值时才从系统内核socket读取mysql server返回的错误，此时go-sql-driver/mysql知道mysql server返回错误了。这个时候有两个策略：
+
+一是返回driver.ErrBadConn，在官方go-sql-driver/mysql包进行重试，release版本-v1.3.0使用这种策略。
+二是返回db error，因为从mysql应用层面来说，它认为已经发送sql成功，只是读取的时候返回错误了，这个时候它不需要重试逻辑，避免sql被重复执行。目前release版本-v1.4.0和v1.4.1就是这种策略。
+
+使用release版本-v1.4.1，经测试mysql server关闭连接后，再执行sql会输出以下日志，其中第一行为go-sql-driver/mysql包的标准错误输出，第二行和第三行是程序逻辑的日志输出，执行sql时返回db error，官方sql包没有进行重试。
+[mysql] 2019/08/01 17:09:41 packets.go:36: unexpected EOF2019/08/01 17:09:41 invalid connectionexit status 1
+
+小结：
+
+优点：
+
+避免了使用激进的重试策略，符合golang定义的规范。
+可以通过SetConnMaxLifetime主动设置DB使用每条连接的时间，只要SetConnMaxLifetime设置的时间比wait_timeout小，go-sql-driver/msyql就能主动关闭连接。
+
+
+缺点：
+
+在不设置SetConnMaxLifetime时，在mysql server关闭连接后再使用该连接机会返回db error，对目前代码冲击比较大。
+
+
+
+解决方案二：更新mysql驱动到最新的master
+目前master的最新提交为 877a9775f06853f611fb2d4e817d92479242d1cd，本节讨论的master基于版本
+
+由于mysql驱动release的版本v1.4.0和v1.4.1废除了原来激进的重试策略，不活跃连接被关闭后仍然会被golang使用，并且不再重试导致直接返回db error。故本小结探讨两个点：
+
+能否在使用连接前确认连接是否被关闭。如果已经被关闭或者有异常数据，则返回driver.ErrBadConn便于database/sql进行重试；如果没有关闭，则复用该连接。
+通过某种机制避免重复执行sql。
+
+为此vicent提出了mr ，目前已经被merge到master中，但是未发布release版本，目前还在不断的优化中。简单描述一下vicent的修改要点：
+
+从pool刚拿出的连接均为不活跃的连接。
+
+刚从pool拿出的连接，如果直接从socket读取一个字节的内容，那么一定不会从mysql服务端收到信息，因为该连接原先是不活跃连接，与mysql server没有实际的数据交换，仅仅是保持连接。如果能读到数据则表示连接有异常，返回driver.ErrBadConn便于database/sql进行重试。
+
+由于Go的runtime使用的是非阻塞（O_NONBLOCK）的socket，可以在向mysql server发送数据包前，先调用read()方法做探测：
+
+1.当read返回 n&#x3D;0&amp;&amp;err&#x3D;&#x3D;nil，表示对端的socket已经关闭，这种情况下返回driver.ErrBadConn，便于go的sql包进行重试。
+2.当read会返回n&gt;0，表示对端的socket有异常，依然能够读取到数据，也意味连接异常，返回driver.ErrBadConn，便于go的sql包进行重试。
+3.当read返回 err&#x3D;EAGAIN(linux) 或者 EWOULDBLOCK(windows)，表示对端的socket未关闭，这种情况下可以复用该连接。由于是非阻塞的read，当对端没有数据可读，程序不会阻塞起来等待数据就绪，而是返回EAGAIN和EWOULDBLOCK提示目前没有数据可读，请稍后再试。
+
+
+刚从pool拿出的连接，如果探测结果为是上面第1和第2种情况，则返回driver.ErrBadConn给上层go官方包便于进行重试；如果探测结果为 EAGAIN 或者 EWOULDBLOCK则可以继续使用此连接。
+
+没有放进pool的连接不需要进行探测，直接复用。
+
+
+使用最新的master，经测试mysql server关闭连接后，再执行sql会输出以下日志，其为mysql驱动输出，并且程序不报错。在mysql client执行 show full processlist 能够看到两条连接的建立，即第一条连接被sever关闭后，由于探测发现连接被关闭，所以不会使用原先的连接而是重新建立连接。
+[mysql] 2019/08/01 19:45:15 packets.go:122: closing bad idle connection: EOF
+
+小结：
+
+优点：
+避免了使用激进的重试策略，符合golang定义的规范。
+通过探测机制避免了在mysql server关闭连接后再使用该连接机会返回db error的影响。
+可以不用设置SetConnMaxLifetime。
+
+
+缺点：
+目前master版本仍然可能对探测机制进行优化中，可以等下一个release发布再更新。
+
+
+
+解决方案三：不升级mysql驱动版本由于目前的重试逻辑存在，我们可以不升级mysql驱动版本。虽然目前日志有错误输出，如果确认是mysql server 主动关闭连接 导致的可以忽略这种错误，毕竟database/sql会进行重试。也可以通过SetConnMaxLifetime设置连接复用时间，到期go-sql-driver/msyql可以自动关闭连接。
+小结：
+
+优点：
+在mysql server关闭连接后再使用该连接机不会返回db error，database/sql能够进行重试。
+可以通过SetConnMaxLifetime主动设置DB使用每条连接的时间，只要SetConnMaxLifetime设置的时间比wait_timeout小，go-sql-driver/msyql就能主动关闭连接。
+
+
+缺点：
+使用激进的重试策略，不符合golang定义的规范，在极端情况下sql仍然可能会被执行多次。
+
+
+
+总结本文分析线上报错的原因以及线下重现问题，通过研究golang源码解释了重试逻辑以及重试逻辑变更原因，解释了vicent探测socket改进的基本思路，最后给出了对应的解决方案：
+1.如果要更新到v1.4.1版本，一定要通过SetConnMaxLifetime设置DB最长使用连接时间，并且要比mysql的wait_timeout小。
+2.如果要使用具有探测socket功能版本，等下一个release版本，可以不用设置SetConnMaxLifetime。
+3.如果暂时不需要更新，能够接受重复执行sql的风险，也最好通过SetConnMaxLifetime设置DB最长使用连接时间，并且要比mysql的wait_timeout小。
+参考链接
+Server timeouts broken since #302 https://github.com/go-sql-driver/mysql/issues/657
+packets: Check connection liveness before writing query https://github.com/go-sql-driver/mysql/pull/934
+Go SQL client attempts write against broken connections https://github.com/go-sql-driver/mysql/issues/529
+Check connection liveness before sending query https://github.com/go-sql-driver/mysql/issues/882
+Golang网络库中socket阻塞调度源码剖析 https://studygolang.com/articles/4977
+Linux中的EAGAIN含义 https://www.cnblogs.com/pigerhan/archive/2013/02/27/2935403.html
+
+]]></content>
+      <tags>
+        <tag>go</tag>
+        <tag>mysql</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>python2中format和%拼接字符串的异同</title>
+    <url>/2020/08/08/python2%E4%B8%ADformat%E5%92%8C%E7%99%BE%E5%88%86%E5%8F%B7%E6%8B%BC%E6%8E%A5%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%BC%82%E5%90%8C.html</url>
+    <content><![CDATA[基础知识相信python2的编码问题大多数开发同学都遇到过，在出现非 ascii 编码字符时，就很容易编码异常的问题。python2的字符编码分为 str 以及 unicode，具体情况这里不再敖述，只会总结字符串拼接时应该注意的问题以及可能遇到的坑点。
+以下几点常识是下面进一步讨论问题的基础：
+
+str转为unicode的过程，称为解码，即 decode。
+unicode转为str，称为编码，即 encode。
+使用%把str和unicode拼接，会自动隐式地把str转为unicode后，再进行拼接。（如果是fomat拼接呢？这里留个悬念，答案稍后揭晓）
+当导入__future__包的unicode_literals特性时，python定义的字符都是unicode，而不是默认的str。这个也是为了让python2能够导入python3的特性，因为在python3中的str都是unicode。
+
+% 拼接字符串我们首先看看pyhon2中的使用%字符串拼接情况。从第一组结果来看，我们可以看到只要格式化串和字符串参数其中一个为unicode，最终结果就为unicode，这个和上面讲的第三点一致。在对str和unicode拼接的时候，会自动把str转为unicode，如第二组的中间两个结果。
+但是我们需要注意编码的问题，如第2个结果，由于”中文”是非 acsii 编码，而且python解释器不知道其类型，会用ascii编码对其进行解码，相当于 u&quot;%s&quot; % (&quot;中文&quot;).decode(&quot;ascii&quot;)，而ascii不认识非 0~127 编码所以就报错，当然我们可以手动指定用”utf-8”进行解码。
+&gt;&gt;&gt; type(&quot;%s&quot; % (&quot;hello&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(u&quot;%s&quot; % (&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(&quot;%s&quot; % (u&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(u&quot;%s&quot; % (u&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt;&gt;&gt;&gt; type(&quot;%s&quot; % (&quot;中文&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(u&quot;%s&quot; % (&quot;中文&quot;))         # 最终结果为unicode，会隐式地通过ascii编码把&quot;中文&quot;解码为unicodeTraceback (most recent call last):  File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;UnicodeDecodeError: &#x27;ascii&#x27; codec can&#x27;t decode byte 0xe4 in position 0: ordinal not in range(128)&gt;&gt;&gt; type(u&quot;%s&quot; % (&quot;中文&quot;.decode(&quot;utf-8&quot;)))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(&quot;%s&quot; % (u&quot;中文&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(u&quot;%s&quot; % (u&quot;中文&quot;))&lt;type &#x27;unicode&#x27;&gt;
+
+format 拼接字符串同样的，我们先看下面的第一组结果，是不是有点吃惊？第一组的第二结果不是unicode类型，而是str类型，这个跟%是不同的。很显然从结果上看，我们知道对于format其拼接结果类型取决于其格式化串的类型，而与参数没有任何关系。
+理解的第一组数据的规律后，再看第二组就知道为什么有的情况会报异常了。第二组的第二个结果，由于最终结果为str，pyhton解释器会默认用 ascii 对 u&quot;中文&quot; 进行编码，而第三个结果，由于最终结果为unicode，python解释器会默认用 ascii 对应 “中文” 进行解码，而报错的理由和前面的情况一致，都是因为ascii不认识非 0~127 编码。
+&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(&quot;hello&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(u&quot;hello&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(u&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt;&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(&quot;中文&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(u&quot;中文&quot;))         # 最终结果为str，会隐式地通过ascii编码把u&quot;中文&quot;编码为asciiTraceback (most recent call last):  File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;UnicodeEncodeError: &#x27;ascii&#x27; codec can&#x27;t encode characters in position 0-1: ordinal not in range(128)&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(u&quot;中文&quot;.encode(&quot;utf-8&quot;)))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(&quot;中文&quot;))          # 最终结果为unicode，会隐式地通过ascii编码把&quot;中文&quot;解码为unicdoeTraceback (most recent call last):  File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;UnicodeDecodeError: &#x27;ascii&#x27; codec can&#x27;t decode byte 0xe4 in position 0: ordinal not in range(128)&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(&quot;中文&quot;.decode(&quot;utf-8&quot;)))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(u&quot;中文&quot;))&lt;type &#x27;unicode&#x27;&gt;
+
+坑点而我们线上的问题，要比以上两种都要隐蔽，大致如下：
+代码目录结构 tree -L 2 -I &quot;*.pyc&quot;.├── test_module_002│   ├── __init__.py│   ├── __pycache__│   ├── main.py│   └── module_a.py
+
+
+
+代码# module_a.pyfrom __future__ import unicode_literalsvariable_a = &quot;mytag&quot;# main.py# -*- encoding=utf8 -*-import sixfrom test_module_002 import module_aif six.PY2:    variable_b = u&quot;中文&quot;.encode(&quot;utf-8&quot;)else:    variable_b = u&quot;中文&quot;if __name__ == &quot;__main__&quot;:    print(&quot;%s %s&quot; % (module_a.variable_a, variable_b))    print(&quot;&#123;&#125; &#123;&#125;&quot;.format(module_a.variable_a, variable_b))    print(&quot;%s %s&quot; % (module_a.variable_a.encode(&quot;utf-8&quot;), variable_b))
+
+分析我们一开始使用的是 % 方式进行拼接字符串，会报类似以下的错误。当时就意识到可能是中文编码问题，于是就尝试使用format，没想到居然成功解决了，但是当时不知道具体原因是什么。
+print &quot;%s %s&quot; % (module_a.variable_a, variable_b)UnicodeDecodeError: &#x27;ascii&#x27; codec can&#x27;t decode byte 0xe4 in position 0: ordinal not in range(128)
+
+但是经过前面的分析，现在回过头来看还是比较清晰的，由于format最终类型为str，所以第二个variable_b不需要解码，只需要把variable_a进行编码就行了。哎？variable_a为什么是unicode，它前面没有u，不应该是str吗？这个也是一大坑点，在引用开源代码时需要注意其模块是否引入了 unicode_literals 特性，如果引入了那么定义的字符就默认为unicode了。
+可能有人会觉得，那我把variable_a用 utf-8 进行编码不就行了，这样不就只是两个str进行拼接吗？是的，这样在 python2 中的确可以，但是需要注意的是这样在 python3 中会加前缀b以及单引号，这样对一些匹配场景会有影响，如下结果所示。
+b&#x27;mytag&#x27; 中文
+
+所以，如果要兼容python2和python3的话，最佳解决办法还是使用format。python2后两种均能正常显示，python3前两种均能正常显示。当然，也可以在print之前通过 six 进行判断，如：
+if six.PY2:    print(&quot;%s %s&quot; % (module_a.variable_a.encode(&quot;utf-8&quot;), variable_b))else:    print(&quot;%s %s&quot; % (module_a.variable_a, variable_b))
+
+
+在编写代码时，从外面导入到系统的参数应该尽快转为unicode类型，在输出到外部时，应该转为str类型，这个也被称为 unicode sandwitch模型。
+
+总结经过以上论述，我们知道了%和format的一些特性以及两者的异同点，分析了一个常见的坑点，并总结了在兼容python2和python3的场景下的方案。以下是本文要点：
+
+使用 % 进行拼接时，格式化串和字符串参数其中一个为unicode，最终结果就为unicode。
+使用 format 进行拼接时，拼接结果类型取决于其格式化串的类型。
+如果引入了unicode_literals特性，那么该模块定义的字符串均为unicode类型。
+
+参考How to fix: “UnicodeDecodeError: ‘ascii’ codec can’t decode byte”Using % and .format() for great good!Pragmatic Unicode &#x3D;&#x3D;&#x3D;&gt; 重点推荐这个视频Python - ‘ascii’ codec can’t decode bytePython2, string .format(), and unicode &#x3D;&#x3D;&#x3D;&gt; 重点推荐这个文章  
+]]></content>
+      <tags>
+        <tag>python2</tag>
+        <tag>python3</tag>
+        <tag>编码</tag>
       </tags>
   </entry>
   <entry>
@@ -1189,401 +1584,6 @@ func server(workChan &lt;-chan *Work) &#123;    for work := range workChan &#123
 ]]></content>
       <tags>
         <tag>go</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>gitlab ci &amp;&amp; docker-compose(4)-mysql的添加权限</title>
-    <url>/2018/09/20/gitlab-ci-docker-compose(4)-mysql%E7%9A%84%E6%B7%BB%E5%8A%A0%E6%9D%83%E9%99%90.html</url>
-    <content><![CDATA[目前网上添加msyql用户和权限时，很多都是使用INSERT, UPDATE, DELETE 直接操作权限表，并且总结得参差不齐。根据官方网站应该使用 CREATE USER 语句创建用户，使用 GRANT 语句添加权限。
-
-在mysql:5.7.22中需要配合 &#x2F;docker-entrypoint-initdb.d&#x2F; 目录初始化数据，这时可以在该目录的sql中可以添加权限的配置。
-
- -- 不应该在这里直接删除&#x27;root&#x27;@&#x27;%&#x27;，否则会影响原本root应有的权限。可以通过该命令查看该命令的影响，SHOW GRANTS FOR &#x27;root&#x27;@&#x27;%&#x27;; -- 如果不删用户root，会出现该权限 GRANT ALL PRIVILEGES ON *.* to &#x27;root&#x27;@&#x27;%&#x27; WITH GRANT OPTION -- 如果删了用户root，会出现该权限 GRANT USAGE ON *.* to &#x27;root&#x27;@&#x27;%&#x27; -- drop user &#x27;root&#x27;@&#x27;%&#x27;; -- 密码在启动mysql容器或者在docker-compose.yml文件中时就应该指定，如 -- docker run -e MYSQL_ROOT_PASSWORD=test mysql:5.7.22 -- 或 -- environment: --     - MYSQL_ROOT_PASSWORD=test -- CREATE USER &#x27;root&#x27;@&#x27;%&#x27; IDENTIFIED BY &#x27;test&#x27;;GRANT ALL PRIVILEGES ON YOU_DATABASE.* TO &#x27;root&#x27;@&#x27;%&#x27;;
-
-
-当然建库建表前应该用if判断，不判断也行，因为本来就是新实例。
-
-DROP DATABASE IF EXISTS YOUR_DATABASE;CREATE DATABASE YOUR_DATABASE;USE YOUR_DATABASE;CREATE TABLE `your_table` () ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT=&#x27;必要的注释&#x27;;
-
-
-查看权限
-
-SHOW GRANTS FOR &#x27;root&#x27;@&#x27;%&#x27;;
-
-docker-compose up命令运行docker-compose up时，如果以前未创建相应的镜像，则默认会创建镜像并且根据该镜像启动container；如果以前创建过镜像，则判断当前是否有对应的container，如果有则直接启动，如果没有则创建对应的container；
-
-–build  Build images before starting containers.
-
-–build，加了这个选项后，每次运行 docker-compose up 都会构建镜像。构建镜像有另外一个专门的命令docker-compose build，可以使用–build-arg key&#x3D;val 传入编译时参数，如下则为 –build-arg X&#x3D;3 –build-arg Y&#x3D;4。传入到docker-compose后，再传到dockerfile的 ARG 声明的同名变量中，
-
-
-
-# docker-compose.ymlversion: &#x27;3&#x27;services:    app:        build:            context: .            dockerfile: docker/dockerfile            args:                X: $&#123;X:-1&#125; #如果X不传，则X为1                Y: $&#123;Y:-2&#125; #如果Y不传，则Y为2# dockerfileFROM some-image# 包含编译时默认值ARG X=1ARG Y=gitlabci# 编译时不包含默认值#ARG X#ARG Y# 设置容器内部环境变量ENV X=$XENV Y=$Y
-
-
-–force-recreate  Recreate containers even if their configuration and image haven’t changed.
-–force-recreate，加了这个选项后，docker-compose会重新创建container，即使与它对应的镜像没有变化
-
-
--V, –renew-anon-volumes   Recreate anonymous volumes instead of retrievingdata from the previous containers.
-1.22.0版本有这个选项，某些低版本的不存在该选项
-仅在启动的容器已经被创建的情况下有意义
-从字面上来看，使用该选项运行docker-compose up 启动容器时，将会不使用复用上一个container的volume，而是重新创建对应的volume。如果不使用该选项，而是只加了–force-recreate也将仅仅会重新创建对应的容器，而不会重新mount根据对应目录而创建的volume。这个可以通过docker inpsect containter_name命令验证，两次运行docker-compose –build –force-recreate所创建的容器对应的volume的name依然相同。
-这个选项的存在的意义是，如果加了改选项，第一次启动容器的时候，mount对应的目录的文件有误，想stop掉当前的container，并且在对应的目录添加了对应的文件后，第二次启动容器时能够重新mount对应的文件夹，使容器读取正确对应的文件；如果不加改选项，则使用上一个container的volume，不能读取正确的文件
-当然，也可以不使用该命令，只要不是重启container的场景即可，什么意思呢，可以先 docker-compose rm -v contaner_name，下次docker-compose up的时候就是创建新容器了，当然也会重新挂载对应的volume。目前低版本的docker-comopose就是这么做的。
-之前在mysql:5.7.22 版本的docker容器在使用&#x2F;docker-entrypoint-initdb.d&#x2F; 目录初始化数据时，遇到类似的问题，踩了很多坑。
-
-
-总结，docker-compose up 与 docker start 命令更相似，因为它们都会复用之前的container（如果存在），而docker run是总会创建新的container。这要点需要牢记，才能避免踩坑。
-
-参考:
-Mysql官网 https://dev.mysql.com/doc/refman/5.7/en/adding-users.html
-]]></content>
-      <tags>
-        <tag>docker</tag>
-        <tag>gitlabci</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>gitlab ci &amp;&amp; docker-compose(5)-容器启动环境变量传递</title>
-    <url>/2018/09/25/gitlab-ci-docker-compose(5)-%E5%AE%B9%E5%99%A8%E5%90%AF%E5%8A%A8%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%E4%BC%A0%E9%80%92.html</url>
-    <content><![CDATA[docker run和docker-compose启动容器环境变量传递dockrfile中的ENV和CMD的关系（不考虑ENTRYPOINT）
-docker run使用默认命令 &amp;&amp; dockerfile中 ENV VERSION&#x3D;100, CMD [“echo”,”$VERSION”]：输出空
-
-docker run使用默认命令 &amp;&amp; dockrfile中 ENV VERSION&#x3D;100，CMD [“sh”,”-c”,”echo”,”$VERSION”]：输出空
-
-docker run使用默认命令 &amp;&amp; dockrfile中 ENV VERSION&#x3D;100，CMD [“sh”,”-c”,”echo $VERSION”]：输出100
-
-docker run使用默认命令 &amp;&amp; dockrfile中 ENV VERSION&#x3D;100，CMD echo $VERSION：输出100
-
-
-小结：docker run使用默认命令中要读取容器内部的环境变量的话，一定要使用后两种方式。并且需要记住的是，使用默认命令的情况下主机的环境变量不会影响container的变量，比如在root的shell下执行export VERSION&#x3D;101，对以上四个结果都不会有影响
-docke run使用指定命令执行与shell环境变零的关系docke run使用指定命令，docker run image_name echo $VERSION：则输出本地shell的VERSION变量，这个VERSION变量跟container一点关系都没有，完全取决于当前shell的环境变量。需要注意的是，由于docker run时一般是在root权限下，所以执行export VERSION=xxx 时，请先执行su -，避免因为使用sudo改变了实际的shell导致不能输出。
-
-
-docker-compose中的environment和dockerfile中CMD的关系（dockerfile不考虑ENTRYPOINT，docke-compose不指定command和entrypoint）由前面可知，要在CMD使用环境变量，必须是 [&quot;sh&quot;,&quot;-c&quot;,&quot;echo $VERSION&quot;] 或 echo $VERSION 模式，其他几个不再解释。
-
-docker-compose.yml不指定enviroment &amp;&amp; dockerfile中 ENV VERSION&#x3D;100, CMD [“sh”,”-c”,”echo $VERSION”]: 输出100
-
-docker-compose.yml指定enviroment: ${VERSION:-200} &amp;&amp; dockerfile中 ENV VERSION&#x3D;100, CMD [“sh”,”-c”,”echo $VERSION”]: 输出200
-
-docker-compose.yml指定enviroment: ${VERSION:-200} &amp;&amp; dockerfile中 ENV VERSION&#x3D;100, CMD [“sh”,”-c”,”echo $VERSION”] &amp;&amp; su - 下执行 export VERSION&#x3D;300: 输出300
-
-
-小结：在docker-compose模式下，shell环境变量优先于默认变量（此例中默认变量为200），docker-compose.yml中的environment变量优先于dockerfile中的ENV。其实docker-compose.yml中enviroment中的变量，会在docker-compose up的时候会创建或覆盖容器对应的环境变量，所以导致容器启动时它的优先级高于dockerfile中的ENV。
-对于docker-compose指定command的情况与 ‘docke run使用指定命令执行与shell环境变零的关系’一致，不再举例。
-善用 docker-compose config 查看解析后的yml是怎样的。
-更多参考：
-dockerfile中的cmd：https://docs.docker.com/engine/reference/builder/#cmd
-dockerfile的最佳实践：https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
-docker build传入多个编译时变量：https://stackoverflow.com/questions/42297387/docker-build-with-build-arg-with-multiple-arguments
-docker-compose中的environment：https://docs.docker.com/compose/compose-file/#environment
-docker-compose中的变量：https://docs.docker.com/compose/compose-file/#variable-substitution
-docker-comppose中的变量的优先顺序：https://docs.docker.com/compose/environment-variables/
-Declare default environment variables in file：https://docs.docker.com/compose/env-file/
-ENTRYPOINT的shell模式的副作用：https://docs.docker.com/engine/reference/builder/#entrypoint
-]]></content>
-      <tags>
-        <tag>docker</tag>
-        <tag>gitlabci</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>gitlab ci &amp;&amp; docker-compose(3)-mysql的初始化</title>
-    <url>/2018/09/18/gitlab-ci-docker-compose(3)-mysql%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96.html</url>
-    <content><![CDATA[mysql 容器初始化：
-根据官方文档可以使用docker启动时bind主机包含sql、sh文件的目录到容器&#x2F;docker-entrypoint-initdb.d&#x2F;目录，在使用mysql镜像启动容器时会自动读取该文件夹下的内容对数据库初始化。可以使用以下两种方式在命令行启动，在低版本中可能只支持-v选项，在docker 17.03.0-ce版本(不含)以上支持–mount选项。
-
---mount选项sudo docker run -it --name=mysql_db --mount type=bind,src=/home/zhang/Workspace/go/src/app/init_sql_script/,dst=/docker-entrypoint-initdb.d/ -e MYSQL_ROOT_PASSWORD=test -d mysql:5.7.22-v选项sudo docker run -it --name=mysql_db -v /home/zhang/Workspace/go/src/app/init_sql_script/:/docker-entrypoint-initdb.d/ -e MYSQL_ROOT_PASSWORD=test -d mysql:5.7.22
-
-
-另外一种方法使用dockerfile的方式。直接在dockerfile中复制相应的sql,sh文件到&#x2F;docker-entrypoint-initdb.d&#x2F;目录下，再根据dockerfile build出对应的镜像，docker run的时候也会直接初始化对应的数据。
-
-# DockerfileMySQLFROM mysql:5.7.22COPY ./init_sql_script/ /docker-entrypoint-initdb.d/
-
-sudo docker build -t app_mysql_db:init-data . sudo docker run --name=app_mysql_db app_mysql_db:init-data
-
-docker-compose启动容器组：
-
-
-可以使用docker-compose启动容器组，先写好 docker-compose.yml后，在build和run。
-
-# docker-compose.ymlversion: &#x27;3&#x27;services:  app:    build:      context: .      dockerfile: DockerfileAPP    image: app:latest    ports:      - &quot;127.0.0.1:8080:8080&quot;    depends_on:      - mysql_db    command: app start  mysql_db:    #build:    #  context: .    #  dockerfile: DockerfileMySQL    #image: mysql_db:latest    image: &quot;mysql:5.7.22&quot;    environment:      - MYSQL_ROOT_PASSWORD=test    expose:      - &quot;3306&quot;    volume:      - ./init_sql_script/:/docker-entrypoint-initdb.d/
-
-sudo docker-compose build sudo docker-compose up --force-recreate
-
-gitlab ci 启动容器组:
-gitlab ci 对于使用bind(–monut or -v)方式初始化数据库有还未有很好的支持。在gitlab ci中使用docker-compose中启动容器组时，docker-compose.yml中使用bind模式时不能成功初始化数据。如果docker-compose.yml使用dockerfile的方式则能够初始化数据。
-
-参考:
-mysql官方docker说明 https://hub.docker.com/_/mysql/
-Introduce relative entrypoints and start services after project clone and checkouthttps://gitlab.com/gitlab-org/gitlab-runner/issues/3210
-MIGRATING TO GITLAB CI SERVICEShttps://www.mariocarrion.com/2017/10/16/gitlab-ci-services.html
-gitlab ci: mysql build and restore db dumphttps://stackoverflow.com/questions/44009941/gitlab-ci-mysql-build-and-restore-db-dump
-]]></content>
-      <tags>
-        <tag>docker</tag>
-        <tag>gitlabci</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>gitlab ci &amp;&amp; docker-compose(6)-容器启动先后顺序</title>
-    <url>/2018/09/26/gitlab-ci-docker-compose(6)-%E5%AE%B9%E5%99%A8%E5%90%AF%E5%8A%A8%E5%85%88%E5%90%8E%E9%A1%BA%E5%BA%8F.html</url>
-    <content><![CDATA[docker-compose容器启动先后顺序问题App应用程序容器需要连接一个mysql容器，使用docker-compose启动容器组，应该怎么做？在docker-compose中，容器A依赖容器B，B容器会先启动，然后再启动A容器，但是B容器不一定初始化完毕对外服务。
-先来看一段mysql官方对于这种问题的两段说明
-
-No connections until MySQL init completes
-
-If there is no database initialized when the container starts, then a default database will be created. While this is the expected behavior, this means that it will not accept incoming connections until such initialization completes. This may cause issues when using automation tools, such as docker-compose, which start several containers simultaneously.
-If the application you’re trying to connect to MySQL does not handle MySQL downtime or waiting for MySQL to start gracefully, then a putting a connect-retry loop before the service starts might be necessary. For an example of such an implementation in the official images, see WordPress or Bonita.
-
-
-所以一般有两种方法解决类似的问题
-
-程序层面改进，程序连接mysql部分需要有重连机制
-连接容器改进，在shell命令中判断mysql容器是否启动，如果未启动设定时间等待，如果启动了再启动应用程序
-
-这里只说明第二种方法
-使用wait-for-it.sh# docker-compose.ymlversion: &#x27;3&#x27;services:  app:    build:      context: .      dockerfile: DockerfileAPP    image: app:latest    ports:      - &quot;127.0.0.1:8080:8080&quot;    depends_on:      - mysql_db    command: /go/src/app/wait-for-it.sh mysql_db:3306 -s -t 30 -- /go/src/app/app-release start  mysql_db:    #build:    #  context: .    #  dockerfile: DockerfileMySQL    #image: mysql_db:latest    image: &quot;mysql:5.7.22&quot;    environment:      - MYSQL_ROOT_PASSWORD=test    expose:      - &quot;3306&quot;    volume:      - ./init_sql_script/:/docker-entrypoint-initdb.d/
-
-注意这行代码
-
-command: &#x2F;go&#x2F;src&#x2F;app&#x2F;wait-for-it.sh mysql_db:3306 -s -t 30 – &#x2F;go&#x2F;src&#x2F;app&#x2F;app-release start
-
--s 表示如果没有检测到host为mysql_db的3306端口，则不执行后面的命令；-t 30表示超时时间为30秒，更多配置见参考。wait-for-it.sh可以使用多次，比如需要等待msyql和redis，可以这么写command: /go/src/app/wait-for-it.sh mysql_db:3306 -s -t 30 -- command: /go/src/app/wait-for-it.sh redis:6379 -s -t 30 -- /go/src/app/app-release start
-参考：
-mysql官方docker说明：https://hub.docker.com/_/mysql/
-Control startup order in Compose：https://docs.docker.com/compose/startup-order/
-vishnubob&#x2F;wait-for-it：https://github.com/vishnubob/wait-for-it
-Docker-compose check if mysql connection is ready：https://stackoverflow.com/questions/42567475/docker-compose-check-if-mysql-connection-is-ready
-]]></content>
-      <tags>
-        <tag>docker</tag>
-        <tag>gitlabci</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>golang数据库连接broken pipe异常原因分析及解决</title>
-    <url>/2019/11/10/golang%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%9E%E6%8E%A5broken-pipe%E5%BC%82%E5%B8%B8%E5%8E%9F%E5%9B%A0%E5%88%86%E6%9E%90%E5%8F%8A%E8%A7%A3%E5%86%B3.html</url>
-    <content><![CDATA[
-在golang开发中，在使用mysql数据库时一般使用数据库驱动包为 go-sql-driver&#x2F;mysql，该包是按照go官方包database&#x2F;sql定义规范实现的。我们线上的程序偶尔会在标准错误输出 “broken pip”，为了究其原因做了些调研，并给出了解决方法。
-
-线上场景目前 项目A 使用的go-sql-driver&#x2F;mysql版本为 3654d25ec346ee8ce71a68431025458d52a38ac0 ， 项目B 使用的版本为 v1.3.0 ，其中 项目A 的版本低于v1.3.0。它们线上标准错误输出都有类似以下的日志，但是程序的业务逻辑却没有影响。
-[mysql] 2019/08/01 17:12:18 packets.go:33: unexpected EOF[mysql] 2019/08/01 17:12:18 packets.go:130: write tcp 127.0.0.1:59722-&gt;127.0.0.1:3306: write: broken pipe
-
-通过日志输出以及堆栈可以找到 go-sql-driver/mysql/packets.go 对应的源码，可以发现第一条日志是以下第8行代码打印，第二条是第9行调用mc.Close()关闭连接时报错。
-// Read packet to buffer &#x27;data&#x27;func (mc *mysqlConn) readPacket() ([]byte, error) &#123;    var prevData []byte    for &#123;        // read packet header        data, err := mc.buf.readNext(4)        if err != nil &#123;            errLog.Print(err)            mc.Close()            return nil, driver.ErrBadConn        &#125;     // 省略部分代码&#125;
-
-问题复现
-通过网上搜索能够大概猜出是mysql server主动关闭的原因，我们可以通过设置mysql server主动关闭连接来复现线上场景，并且通过tcpdump观察其原因。
-
-1.设置mysql server主动关闭连接时间mysql server默认设置的关闭不活跃连接时间为28800秒（8小时），我们通过 set global wait_time=10 设置为10秒，便于问题重现。
-2.运行tcpdump和测试demo1.通过tcpdump可以收集tcp数据包的发送接收情况，尤其是的在mysql server关闭连接后，go程序如何和mysql server交互是我们关注的重点，tcpdump命令如下：
-sudo tcpdump -s 0 -t -i lo -l port 3306 -w lo.cap
-2.运行一个简单的测试demo
-package mainimport (    &quot;database/sql&quot;    &quot;log&quot;    &quot;time&quot;    _ &quot;github.com/go-sql-driver/mysql&quot;)func main() &#123;    // before you run this test program, please run the script in your mysql    // &quot;set global wait_timeout=10;&quot;    // 表示mysql server关闭不活跃连接的等待时间    // 参考 https://github.com/go-sql-driver/mysql/issues/657    db, err := sql.Open(&quot;mysql&quot;, &quot;root:zhang@tcp(127.0.0.1:3306)/?charset=latin1&amp;autocommit=1&amp;parseTime=true&amp;loc=Local&amp;timeout=3s&quot;)    if err != nil &#123;        log.Fatal(err)    &#125;    defer db.Close()    //db.SetConnMaxLifetime(5 * time.Second)    err = db.Ping()    if err != nil &#123;        log.Fatal(err)    &#125;    go func() &#123;        for &#123;            _, err := db.Exec(&quot;select * from test_time.A&quot;)            if err != nil &#123;                log.Fatal(err)            &#125;            // Wait for 11 seconds. This should be enough to timeout the conn, since `wait_timeout` is 10s            time.Sleep(11 * time.Second)        &#125;    &#125;()    time.Sleep(1000 * time.Second)&#125;
-
-
-
-3.分析tcp数据包通过wireshark打开lo.cap文件可以更加直观观察其交互情况，截图如下二图：
-可以看到10秒的第222号数据包中，mysql server发送的FIN信号并且收到了golang程序第223号的ack后，进入到tcp连接中FIN_WAIT_2状态，golang程序则进入到CLOSE_WAIT状态，此时mysql server不再接受任何查询请求。同时由于golang程序应用层无法感知mysql server关闭了连接，在11秒第224号的数据包中依然向mysql server发送了查询请求，mysql server应用层发现错误，直接返回重置连接。应用程序也打印出对应的日志。
-小结通过复现和分析，可知根本原因是golang尝试去使用一个被mysql server主动关闭的连接。通过代码堆栈分析，还分析出unexpected EOF是发送查询给mysql server后读取返回结果报错，而write tcp 127.0.0.1:59722-&gt;127.0.0.1:3306: write: broken pipe则是读取结果报错后尝试关闭连接时失败的报错。
-mysql server连接和golang数据库连接池的复用时间
-通过上一节，基本能确定是mysql server主动关闭连接的原因导致的，那么mysql server的 wait_timeout具体的定义和golang怎么解决这种问题的？对我们的业务有无影响？
-
-1.mysql连接复用时间mysql server在一定时间后将自动关闭不活跃连接。这个时间由wait_timeout决定，表示mysql server关闭 不活跃 连接的等待时间。wait_timeout配置官方说明如下。
-wait_timeout: The number of seconds the server waits for activity on a noninteractive connection before closing it.https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_wait_timeout
-
-2.golang数据库连接池复用时间go的默认连接池不会自动关闭连接，除非通过 DB.SetConnMaxLifetime() 设置了连接最长的时间，一般建议该配置远小于mysql server的wait_timeout。
-// SetConnMaxLifetime sets the maximum amount // of time a connection may be reused.//// Expired connections may be closed lazily before reuse.//// If d &lt;= 0, connections are reused forever.func (db *DB) SetConnMaxLifetime(d time.Duration)
-
-如果某个连接已经被mysql server关闭，而go程序无法感知，在复用该数据库连接时则会输出上述的错误日志。目前 项目A 和 项目B 的mysql驱动版本将这种错误情况返回 driver.ErrBadConn。
-3.对业务的影响
-这种mysql server主动关闭连接的情况，对我们的业务有没影响？
-
-go的官方 database/sql 包会对返回 driver.ErrBadConn 的错误进行重试，这点可以通过看源码 database/sql/sql.go 验证。可以看到只要驱动包返回了drvier.ErrBadConn，那么就会进行重试2次。因此如果第一次执行失败了，那么还会进行重试，所以最终对业务不会有影响，只是标准错误输出有对应的日志输出。
-// maxBadConnRetries is the number of maximum retries if the driver returns// driver.ErrBadConn to signal a broken connection before forcing a new// connection to be opened.const maxBadConnRetries = 2// ExecContext executes a query without returning any rows.// The args are for any placeholder parameters in the query.func (db *DB) ExecContext(ctx context.Context, query string, args ...interface&#123;&#125;) (Result, error) &#123;    var res Result    var err error    for i := 0; i &lt; maxBadConnRetries; i++ &#123;        res, err = db.exec(ctx, query, args, cachedOrNewConn)        if err != driver.ErrBadConn &#123;            break        &#125;    &#125;    if err == driver.ErrBadConn &#123;        return db.exec(ctx, query, args, alwaysNewConn)    &#125;    return res, err&#125;
-
-
-解决方案
-测试demo见问题复现章节
-
-解决方案一：更新mysql驱动到目前最新release版本-v1.4.1目前最新release的版本v1.4.1包含了修改以前 激进重试策略 的提交（代码修改逻辑见 commit），将 许多 情况下从返回 driver.ErrBadConn 改为返回 ErrInvalidConn，减少滥用官方sql包的重试逻辑。本章讨论的mysql server主动关闭连接也在此次修改中。
-跟踪源代码调用栈发现，由于连接为非阻塞socket，在mysql server关闭连接后，go-sql-driver/mysql还能继续write数据到socket的buffer中，并且不会立即返回错误。在go-sql-driver/mysql读取返回值时才从系统内核socket读取mysql server返回的错误，此时go-sql-driver/mysql知道mysql server返回错误了。这个时候有两个策略：
-
-一是返回driver.ErrBadConn，在官方go-sql-driver/mysql包进行重试，release版本-v1.3.0使用这种策略。
-二是返回db error，因为从mysql应用层面来说，它认为已经发送sql成功，只是读取的时候返回错误了，这个时候它不需要重试逻辑，避免sql被重复执行。目前release版本-v1.4.0和v1.4.1就是这种策略。
-
-使用release版本-v1.4.1，经测试mysql server关闭连接后，再执行sql会输出以下日志，其中第一行为go-sql-driver/mysql包的标准错误输出，第二行和第三行是程序逻辑的日志输出，执行sql时返回db error，官方sql包没有进行重试。
-[mysql] 2019/08/01 17:09:41 packets.go:36: unexpected EOF2019/08/01 17:09:41 invalid connectionexit status 1
-
-小结：
-
-优点：
-
-避免了使用激进的重试策略，符合golang定义的规范。
-可以通过SetConnMaxLifetime主动设置DB使用每条连接的时间，只要SetConnMaxLifetime设置的时间比wait_timeout小，go-sql-driver/msyql就能主动关闭连接。
-
-
-缺点：
-
-在不设置SetConnMaxLifetime时，在mysql server关闭连接后再使用该连接机会返回db error，对目前代码冲击比较大。
-
-
-
-解决方案二：更新mysql驱动到最新的master
-目前master的最新提交为 877a9775f06853f611fb2d4e817d92479242d1cd，本节讨论的master基于版本
-
-由于mysql驱动release的版本v1.4.0和v1.4.1废除了原来激进的重试策略，不活跃连接被关闭后仍然会被golang使用，并且不再重试导致直接返回db error。故本小结探讨两个点：
-
-能否在使用连接前确认连接是否被关闭。如果已经被关闭或者有异常数据，则返回driver.ErrBadConn便于database/sql进行重试；如果没有关闭，则复用该连接。
-通过某种机制避免重复执行sql。
-
-为此vicent提出了mr ，目前已经被merge到master中，但是未发布release版本，目前还在不断的优化中。简单描述一下vicent的修改要点：
-
-从pool刚拿出的连接均为不活跃的连接。
-
-刚从pool拿出的连接，如果直接从socket读取一个字节的内容，那么一定不会从mysql服务端收到信息，因为该连接原先是不活跃连接，与mysql server没有实际的数据交换，仅仅是保持连接。如果能读到数据则表示连接有异常，返回driver.ErrBadConn便于database/sql进行重试。
-
-由于Go的runtime使用的是非阻塞（O_NONBLOCK）的socket，可以在向mysql server发送数据包前，先调用read()方法做探测：
-
-1.当read返回 n&#x3D;0&amp;&amp;err&#x3D;&#x3D;nil，表示对端的socket已经关闭，这种情况下返回driver.ErrBadConn，便于go的sql包进行重试。
-2.当read会返回n&gt;0，表示对端的socket有异常，依然能够读取到数据，也意味连接异常，返回driver.ErrBadConn，便于go的sql包进行重试。
-3.当read返回 err&#x3D;EAGAIN(linux) 或者 EWOULDBLOCK(windows)，表示对端的socket未关闭，这种情况下可以复用该连接。由于是非阻塞的read，当对端没有数据可读，程序不会阻塞起来等待数据就绪，而是返回EAGAIN和EWOULDBLOCK提示目前没有数据可读，请稍后再试。
-
-
-刚从pool拿出的连接，如果探测结果为是上面第1和第2种情况，则返回driver.ErrBadConn给上层go官方包便于进行重试；如果探测结果为 EAGAIN 或者 EWOULDBLOCK则可以继续使用此连接。
-
-没有放进pool的连接不需要进行探测，直接复用。
-
-
-使用最新的master，经测试mysql server关闭连接后，再执行sql会输出以下日志，其为mysql驱动输出，并且程序不报错。在mysql client执行 show full processlist 能够看到两条连接的建立，即第一条连接被sever关闭后，由于探测发现连接被关闭，所以不会使用原先的连接而是重新建立连接。
-[mysql] 2019/08/01 19:45:15 packets.go:122: closing bad idle connection: EOF
-
-小结：
-
-优点：
-避免了使用激进的重试策略，符合golang定义的规范。
-通过探测机制避免了在mysql server关闭连接后再使用该连接机会返回db error的影响。
-可以不用设置SetConnMaxLifetime。
-
-
-缺点：
-目前master版本仍然可能对探测机制进行优化中，可以等下一个release发布再更新。
-
-
-
-解决方案三：不升级mysql驱动版本由于目前的重试逻辑存在，我们可以不升级mysql驱动版本。虽然目前日志有错误输出，如果确认是mysql server 主动关闭连接 导致的可以忽略这种错误，毕竟database/sql会进行重试。也可以通过SetConnMaxLifetime设置连接复用时间，到期go-sql-driver/msyql可以自动关闭连接。
-小结：
-
-优点：
-在mysql server关闭连接后再使用该连接机不会返回db error，database/sql能够进行重试。
-可以通过SetConnMaxLifetime主动设置DB使用每条连接的时间，只要SetConnMaxLifetime设置的时间比wait_timeout小，go-sql-driver/msyql就能主动关闭连接。
-
-
-缺点：
-使用激进的重试策略，不符合golang定义的规范，在极端情况下sql仍然可能会被执行多次。
-
-
-
-总结本文分析线上报错的原因以及线下重现问题，通过研究golang源码解释了重试逻辑以及重试逻辑变更原因，解释了vicent探测socket改进的基本思路，最后给出了对应的解决方案：
-1.如果要更新到v1.4.1版本，一定要通过SetConnMaxLifetime设置DB最长使用连接时间，并且要比mysql的wait_timeout小。
-2.如果要使用具有探测socket功能版本，等下一个release版本，可以不用设置SetConnMaxLifetime。
-3.如果暂时不需要更新，能够接受重复执行sql的风险，也最好通过SetConnMaxLifetime设置DB最长使用连接时间，并且要比mysql的wait_timeout小。
-参考链接
-Server timeouts broken since #302 https://github.com/go-sql-driver/mysql/issues/657
-packets: Check connection liveness before writing query https://github.com/go-sql-driver/mysql/pull/934
-Go SQL client attempts write against broken connections https://github.com/go-sql-driver/mysql/issues/529
-Check connection liveness before sending query https://github.com/go-sql-driver/mysql/issues/882
-Golang网络库中socket阻塞调度源码剖析 https://studygolang.com/articles/4977
-Linux中的EAGAIN含义 https://www.cnblogs.com/pigerhan/archive/2013/02/27/2935403.html
-
-]]></content>
-      <tags>
-        <tag>go</tag>
-        <tag>mysql</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>go系列-中间件</title>
-    <url>/2018/09/29/go%E7%B3%BB%E5%88%97-%E4%B8%AD%E9%97%B4%E4%BB%B6.html</url>
-    <content><![CDATA[go中间件最近看代码看到go中间件的代码，遂搜相关代码以及类似的框架进行学习 
-什么是中间件
-了解中间件前需要了解 ServeMux、DefaultServeMux、http.Handler、http.HandlerFunc、mux.HandleFunc、ServeHTTP 等相关知识和它们之间的关系[推荐]https://www.alexedwards.net/blog/a-recap-of-request-handling
-
-context能做什么https://blog.questionable.services/article/map-string-interface/
-
-
-gorilla系列 &amp; Negroni
-Go实战–Golang中http中间件(goji&#x2F;httpauth、urfave&#x2F;negroni、gorilla&#x2F;handlers、justinas&#x2F;alice)https://blog.csdn.net/wangshubo1989/article/details/79227443
-
-Go实战–Gorilla web toolkit使用之gorilla&#x2F;handlershttps://blog.csdn.net/wangshubo1989/article/details/78970282
-
-Go实战–Gorilla web toolkit使用之gorilla&#x2F;contexthttps://blog.csdn.net/wangshubo1989/article/details/78910935
-
-gorilla&#x2F;mux https://github.com/gorilla/mux (需要着重看一下 文中的Graceful Shutdown和 https://github.com/gorilla/mux#graceful-shutdown）
-
-Negroni https://github.com/urfave/negroni
-
-
-[代码学习](https://github.com/salmon7/go-learning/tree/master/middle
-justinas&#x2F;alice&#x2F;&#x2F; TO-DO
-]]></content>
-      <tags>
-        <tag>go</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>python2中format和%拼接字符串的异同</title>
-    <url>/2020/08/08/python2%E4%B8%ADformat%E5%92%8C%E7%99%BE%E5%88%86%E5%8F%B7%E6%8B%BC%E6%8E%A5%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%BC%82%E5%90%8C.html</url>
-    <content><![CDATA[基础知识相信python2的编码问题大多数开发同学都遇到过，在出现非 ascii 编码字符时，就很容易编码异常的问题。python2的字符编码分为 str 以及 unicode，具体情况这里不再敖述，只会总结字符串拼接时应该注意的问题以及可能遇到的坑点。
-以下几点常识是下面进一步讨论问题的基础：
-
-str转为unicode的过程，称为解码，即 decode。
-unicode转为str，称为编码，即 encode。
-使用%把str和unicode拼接，会自动隐式地把str转为unicode后，再进行拼接。（如果是fomat拼接呢？这里留个悬念，答案稍后揭晓）
-当导入__future__包的unicode_literals特性时，python定义的字符都是unicode，而不是默认的str。这个也是为了让python2能够导入python3的特性，因为在python3中的str都是unicode。
-
-% 拼接字符串我们首先看看pyhon2中的使用%字符串拼接情况。从第一组结果来看，我们可以看到只要格式化串和字符串参数其中一个为unicode，最终结果就为unicode，这个和上面讲的第三点一致。在对str和unicode拼接的时候，会自动把str转为unicode，如第二组的中间两个结果。
-但是我们需要注意编码的问题，如第2个结果，由于”中文”是非 acsii 编码，而且python解释器不知道其类型，会用ascii编码对其进行解码，相当于 u&quot;%s&quot; % (&quot;中文&quot;).decode(&quot;ascii&quot;)，而ascii不认识非 0~127 编码所以就报错，当然我们可以手动指定用”utf-8”进行解码。
-&gt;&gt;&gt; type(&quot;%s&quot; % (&quot;hello&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(u&quot;%s&quot; % (&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(&quot;%s&quot; % (u&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(u&quot;%s&quot; % (u&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt;&gt;&gt;&gt; type(&quot;%s&quot; % (&quot;中文&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(u&quot;%s&quot; % (&quot;中文&quot;))         # 最终结果为unicode，会隐式地通过ascii编码把&quot;中文&quot;解码为unicodeTraceback (most recent call last):  File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;UnicodeDecodeError: &#x27;ascii&#x27; codec can&#x27;t decode byte 0xe4 in position 0: ordinal not in range(128)&gt;&gt;&gt; type(u&quot;%s&quot; % (&quot;中文&quot;.decode(&quot;utf-8&quot;)))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(&quot;%s&quot; % (u&quot;中文&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(u&quot;%s&quot; % (u&quot;中文&quot;))&lt;type &#x27;unicode&#x27;&gt;
-
-format 拼接字符串同样的，我们先看下面的第一组结果，是不是有点吃惊？第一组的第二结果不是unicode类型，而是str类型，这个跟%是不同的。很显然从结果上看，我们知道对于format其拼接结果类型取决于其格式化串的类型，而与参数没有任何关系。
-理解的第一组数据的规律后，再看第二组就知道为什么有的情况会报异常了。第二组的第二个结果，由于最终结果为str，pyhton解释器会默认用 ascii 对 u&quot;中文&quot; 进行编码，而第三个结果，由于最终结果为unicode，python解释器会默认用 ascii 对应 “中文” 进行解码，而报错的理由和前面的情况一致，都是因为ascii不认识非 0~127 编码。
-&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(&quot;hello&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(u&quot;hello&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(u&quot;hello&quot;))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt;&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(&quot;中文&quot;))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(u&quot;中文&quot;))         # 最终结果为str，会隐式地通过ascii编码把u&quot;中文&quot;编码为asciiTraceback (most recent call last):  File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;UnicodeEncodeError: &#x27;ascii&#x27; codec can&#x27;t encode characters in position 0-1: ordinal not in range(128)&gt;&gt;&gt; type(&quot;&#123;&#125;&quot;.format(u&quot;中文&quot;.encode(&quot;utf-8&quot;)))&lt;type &#x27;str&#x27;&gt;&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(&quot;中文&quot;))          # 最终结果为unicode，会隐式地通过ascii编码把&quot;中文&quot;解码为unicdoeTraceback (most recent call last):  File &quot;&lt;stdin&gt;&quot;, line 1, in &lt;module&gt;UnicodeDecodeError: &#x27;ascii&#x27; codec can&#x27;t decode byte 0xe4 in position 0: ordinal not in range(128)&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(&quot;中文&quot;.decode(&quot;utf-8&quot;)))&lt;type &#x27;unicode&#x27;&gt;&gt;&gt;&gt; type(u&quot;&#123;&#125;&quot;.format(u&quot;中文&quot;))&lt;type &#x27;unicode&#x27;&gt;
-
-坑点而我们线上的问题，要比以上两种都要隐蔽，大致如下：
-代码目录结构 tree -L 2 -I &quot;*.pyc&quot;.├── test_module_002│   ├── __init__.py│   ├── __pycache__│   ├── main.py│   └── module_a.py
-
-
-
-代码# module_a.pyfrom __future__ import unicode_literalsvariable_a = &quot;mytag&quot;# main.py# -*- encoding=utf8 -*-import sixfrom test_module_002 import module_aif six.PY2:    variable_b = u&quot;中文&quot;.encode(&quot;utf-8&quot;)else:    variable_b = u&quot;中文&quot;if __name__ == &quot;__main__&quot;:    print(&quot;%s %s&quot; % (module_a.variable_a, variable_b))    print(&quot;&#123;&#125; &#123;&#125;&quot;.format(module_a.variable_a, variable_b))    print(&quot;%s %s&quot; % (module_a.variable_a.encode(&quot;utf-8&quot;), variable_b))
-
-分析我们一开始使用的是 % 方式进行拼接字符串，会报类似以下的错误。当时就意识到可能是中文编码问题，于是就尝试使用format，没想到居然成功解决了，但是当时不知道具体原因是什么。
-print &quot;%s %s&quot; % (module_a.variable_a, variable_b)UnicodeDecodeError: &#x27;ascii&#x27; codec can&#x27;t decode byte 0xe4 in position 0: ordinal not in range(128)
-
-但是经过前面的分析，现在回过头来看还是比较清晰的，由于format最终类型为str，所以第二个variable_b不需要解码，只需要把variable_a进行编码就行了。哎？variable_a为什么是unicode，它前面没有u，不应该是str吗？这个也是一大坑点，在引用开源代码时需要注意其模块是否引入了 unicode_literals 特性，如果引入了那么定义的字符就默认为unicode了。
-可能有人会觉得，那我把variable_a用 utf-8 进行编码不就行了，这样不就只是两个str进行拼接吗？是的，这样在 python2 中的确可以，但是需要注意的是这样在 python3 中会加前缀b以及单引号，这样对一些匹配场景会有影响，如下结果所示。
-b&#x27;mytag&#x27; 中文
-
-所以，如果要兼容python2和python3的话，最佳解决办法还是使用format。python2后两种均能正常显示，python3前两种均能正常显示。当然，也可以在print之前通过 six 进行判断，如：
-if six.PY2:    print(&quot;%s %s&quot; % (module_a.variable_a.encode(&quot;utf-8&quot;), variable_b))else:    print(&quot;%s %s&quot; % (module_a.variable_a, variable_b))
-
-
-在编写代码时，从外面导入到系统的参数应该尽快转为unicode类型，在输出到外部时，应该转为str类型，这个也被称为 unicode sandwitch模型。
-
-总结经过以上论述，我们知道了%和format的一些特性以及两者的异同点，分析了一个常见的坑点，并总结了在兼容python2和python3的场景下的方案。以下是本文要点：
-
-使用 % 进行拼接时，格式化串和字符串参数其中一个为unicode，最终结果就为unicode。
-使用 format 进行拼接时，拼接结果类型取决于其格式化串的类型。
-如果引入了unicode_literals特性，那么该模块定义的字符串均为unicode类型。
-
-参考How to fix: “UnicodeDecodeError: ‘ascii’ codec can’t decode byte”Using % and .format() for great good!Pragmatic Unicode &#x3D;&#x3D;&#x3D;&gt; 重点推荐这个视频Python - ‘ascii’ codec can’t decode bytePython2, string .format(), and unicode &#x3D;&#x3D;&#x3D;&gt; 重点推荐这个文章  
-]]></content>
-      <tags>
-        <tag>python2</tag>
-        <tag>python3</tag>
-        <tag>编码</tag>
       </tags>
   </entry>
   <entry>
